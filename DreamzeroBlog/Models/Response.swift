@@ -10,3 +10,9 @@ struct Response<T: Decodable>: Decodable {
     let msg: String
     let data: [T]
 }
+
+struct SingleResponse<T: Decodable>: Decodable {
+    let code: Int
+    let msg: String
+    let data: T
+}

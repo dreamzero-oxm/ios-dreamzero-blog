@@ -64,7 +64,7 @@ struct PhotoGridView: View {
         @State var ratio: CGFloat = 1
 
         ImageLoader(
-            url: photo.imageURL,
+            url: "https://www.dreamzero.cn" + photo.imageURL,
             onAspectRatio: { ratio = $0 }
         )
             
