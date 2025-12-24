@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Factory
+import MarkdownUI
 
 struct ArticleDetailView: View {
     let articleId: String
@@ -108,9 +109,8 @@ struct ArticleDetailView: View {
                                 Divider()
 
                                 // 文章内容
-                                Text(article.content)
-                                    .font(.body)
-                                    .lineSpacing(8)
+                                Markdown(article.content)
+                                    .markdownTheme(.gitHub)
                             }
                             .padding()
                         }
