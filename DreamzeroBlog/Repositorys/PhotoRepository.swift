@@ -20,7 +20,6 @@ final class PhotoRepository: PhotoRepositoryType {
         let ep = GetPhotoListEndpoint()
         // 发起请求并解析响应
         let resp: SingleResponse<PhotoDto> = try await client.request(ep, as: SingleResponse<PhotoDto>.self)
-        let _ = print("Response: \(resp)")
         // 依据业务逻辑处理响应
         guard resp.code == 0 else {
             // 依据你的项目约定把业务错误往上抛

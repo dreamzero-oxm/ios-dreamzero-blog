@@ -11,6 +11,11 @@ import SwiftData
 struct ContentView: View {
     var body: some View {
         TabView {
+            // 文章列表
+            ArticleListView()
+                .tabItem {
+                    Label("文章", systemImage: "doc.text")
+                }
             
             // Daily Photo View
             PhotoGridView()
@@ -18,18 +23,12 @@ struct ContentView: View {
                     Label("日常照片", systemImage: "photo")
                 }
             
-
-            OtherTabView()
-                .tabItem {
-                    Label("更多", systemImage: "ellipsis.circle")
-                }
             
             // Login Tab
             LoginView()
                 .tabItem {
                     Label("我的", systemImage: "person.crop.circle")
                 }
-            
             
         }
     }

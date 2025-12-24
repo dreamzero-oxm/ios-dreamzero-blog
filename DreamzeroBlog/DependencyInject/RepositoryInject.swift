@@ -14,4 +14,9 @@ extension Container {
     var photoRepository: Factory<PhotoRepositoryType> {
         self { PhotoRepository(client: self.apiClient()) }
     }
+
+    // 注册 ArticleRepository
+    var articleRepository: Factory<ArticleRepositoryType> {
+        self { ArticleRepository(client: self.apiClient()) }
+    }
 }
