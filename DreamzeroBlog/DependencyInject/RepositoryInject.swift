@@ -22,6 +22,11 @@ extension Container {
 
     // 注册 ChatRepository（智谱AI）
     var chatRepository: Factory<ChatRepositoryType> {
-        self { ChatRepository(apiKey: self.zhipuAPIKey()) }
+        self {
+            ChatRepository(
+                client: self.apiClient(),
+                apiKey: self.zhipuAPIKey()
+            )
+        }
     }
 }
