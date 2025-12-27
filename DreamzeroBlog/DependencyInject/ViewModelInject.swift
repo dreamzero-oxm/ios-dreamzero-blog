@@ -25,4 +25,9 @@ extension Container {
     var articleDetailViewModel: Factory<ArticleDetailViewModel> {
         self { ArticleDetailViewModel(repository: self.articleRepository()) }
     }
+
+    // 聊天相关 ViewModel
+    var chatViewModel: Factory<ChatViewModel> {
+        self { ChatViewModel(repository: self.chatRepository()) }
+    }
 }
