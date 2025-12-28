@@ -77,5 +77,75 @@ public final class APIClient {
         }
         return nil
     }
+
+    // MARK: - 流式请求（Server-Sent Events）
+
+    /// 发起流式请求（SSE），用于接收服务器持续发送的数据
+    /// - Parameters:
+    ///   - endpoint: API端点
+    ///   - customBaseURL: 自定义baseURL（可选），用于第三方API如智谱AI
+    /// - Returns: 异步流，逐块返回数据
+    public func streamRequest(
+        _ endpoint: APIEndpoint,
+        customBaseURL: URL? = nil
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        // 使用自定义baseURL或默认baseURL
+        let targetURL = customBaseURL ?? baseURL
+
+        let convertible = APIRequestConvertible(baseURL: targetURL, endpoint: endpoint)
+        let urlRequest = try convertible.asURLRequest()
+
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let (bytes, response) = try await URLSession.shared.bytes(for: urlRequest)
+
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        continuation.finish(throwing: APIError.invalidResponse)
+                        return
+                    }
+
+                    // 检查状态码
+                    guard httpResponse.statusCode == 200 else {
+                        // 读取前 1000 字节用于错误信息
+                        var errorData = Data()
+                        for try await byte in bytes {
+                            errorData.append(byte)
+                            if errorData.count >= 1000 { break }
+                        }
+                        if let errorMessage = String(data: errorData, encoding: .utf8) {
+                            LogTool.shared.error("流式请求失败: \(errorMessage)")
+                            
+                            LogTool.shared.debug("API URL: \(urlRequest.url?.absoluteString ?? "unknown")")
+                        }
+                        continuation.finish(throwing: APIError.server(code: httpResponse.statusCode, message: APIClient.extractMessage(data: nil)))
+                        return
+                    }
+
+                    // 逐行读取SSE响应
+                    for try await line in bytes.lines {
+                        // SSE格式：data: {json}
+                        if line.hasPrefix("data: ") {
+                            let jsonString = String(line.dropFirst(6))
+
+                            // 检查结束标记
+                            if jsonString == "[DONE]" {
+                                continuation.finish()
+                                return
+                            }
+
+                            // 返回JSON字符串，由调用方解析
+                            continuation.yield(jsonString)
+                        }
+                    }
+
+                    continuation.finish()
+                } catch {
+                    LogTool.shared.error("流式请求错误: \(error)")
+                    continuation.finish(throwing: APIError.from(error))
+                }
+            }
+        }
+    }
 }
 
