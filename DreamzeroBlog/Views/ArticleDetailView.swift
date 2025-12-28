@@ -110,7 +110,7 @@ struct ArticleDetailView: View {
 
                                 // 文章内容
                                 Markdown(article.content)
-                                    .markdownTheme(.gitHub)
+                                    .markdownTheme(.article)
                             }
                             .padding()
                         }
