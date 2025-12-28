@@ -23,6 +23,10 @@ struct ContentView: View {
                     Label("日常照片", systemImage: "photo")
                 }
             
+            ChatView()
+                .tabItem {
+                    Label("AI聊天", systemImage: "message")
+                }
             
             // Login Tab
             LoginView()

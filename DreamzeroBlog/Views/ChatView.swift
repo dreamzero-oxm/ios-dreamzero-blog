@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Factory
+import MarkdownUI
 
 struct ChatView: View {
     @State private var viewModel: ChatViewModel
@@ -133,16 +134,26 @@ struct MessageBubble: View {
                     .padding(.horizontal, 8)
 
                 // 消息内容
-                Text(message.content)
-                    .font(.body)
-                    .foregroundColor(message.role == .user ? .white : .primary)
-                    .padding(12)
-                    .background(backgroundColor)
-                    .cornerRadius(16)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(borderColor, lineWidth: 0.5)
-                    )
+                if message.role == .user {
+                    // 用户消息使用普通文本
+                    Text(message.content)
+                        .font(.body)
+                        .foregroundColor(.white)
+                        .padding(12)
+                        .background(backgroundColor)
+                        .cornerRadius(16)
+                } else {
+                    // AI 助手消息使用 Markdown 渲染
+                    Markdown(message.content)
+                        .markdownTheme(.bubble)
+                        .padding(12)
+                        .background(backgroundColor)
+                        .cornerRadius(16)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(borderColor, lineWidth: 0.5)
+                        )
+                }
 
                 // 流式传输指示器
                 if message.isStreaming {
