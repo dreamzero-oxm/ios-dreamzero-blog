@@ -61,11 +61,16 @@ struct ChatView: View {
     }
 
     private var messageList: some View {
-        LazyVStack(spacing: 16) {
-            messageBubbles
-//            streamingIndicator
+        Group {
+            if viewModel.messages.isEmpty {
+                EmptyStateView()
+            } else {
+                LazyVStack(spacing: 16) {
+                    messageBubbles
+                }
+                .padding()
+            }
         }
-        .padding()
     }
 
     private var messageBubbles: some View {
@@ -153,23 +158,101 @@ struct ChatView: View {
     }
 }
 
+// MARK: - 消息头像
+
+struct AvatarView: View {
+    let role: MessageRole
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(backgroundColor)
+                .frame(width: size, height: height)
+
+            Image(systemName: iconName)
+                .font(.system(size: size * 0.5))
+                .foregroundColor(.white)
+        }
+    }
+
+    private var iconName: String {
+        switch role {
+        case .user:
+            return "person.circle.fill"
+        case .assistant:
+            return "brain.head.profile"
+        case .system:
+            return "info.circle.fill"
+        }
+    }
+
+    private var backgroundColor: Color {
+        switch role {
+        case .user:
+            return .blue
+        case .assistant:
+            return .purple
+        case .system:
+            return .orange
+        }
+    }
+
+    private var height: CGFloat {
+        size
+    }
+}
+
+// MARK: - 空状态视图
+
+struct EmptyStateView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+
+            Image(systemName: "message.badge")
+                .font(.system(size: 60))
+                .foregroundColor(.blue.opacity(0.6))
+
+            VStack(spacing: 8) {
+                Text("开始对话")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Text("发送消息，AI 助手将随时为您服务")
+                    .font(.body)
+                    .foregroundColor(.secondary)
+
+                Text("内容由 AI 生成，请仔细甄别")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 // MARK: - 消息气泡
 
 struct MessageBubble: View, Equatable {
     let message: ChatMessage
 
     var body: some View {
-        HStack {
-            if message.role == .user {
-                Spacer(minLength: 60)
+        HStack(alignment: .top, spacing: 8) {
+            if message.role == .assistant {
+                AvatarView(role: message.role, size: 32)
             }
 
             messageContent
 
-            if message.role == .assistant {
-                Spacer(minLength: 60)
+            if message.role == .user {
+                AvatarView(role: message.role, size: 32)
             }
         }
+        .frame(maxWidth: .infinity, alignment: message.role == .user ? .trailing : .leading)
+        .padding(.horizontal, 8)
     }
 
     private var messageContent: some View {
