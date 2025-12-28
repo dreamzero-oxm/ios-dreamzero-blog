@@ -19,62 +19,85 @@ struct ChatView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // 消息列表
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 16) {
-                            ForEach(viewModel.messages) { message in
-                                MessageBubble(message: message)
-                                    .id(message.id)
-                            }
-
-                            // 流式传输中的加载指示器
-                            if viewModel.isStreaming {
-                                HStack {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                    Text("正在思考...")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding()
-                            }
-                        }
-                        .padding()
-                    }
-                    .onChange(of: viewModel.messages.count) { _, _ in
-                        // 新消息添加时滚动到底部
-                        if let lastMessage = viewModel.messages.last {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: viewModel.isStreaming) { _, newValue in
-                        // 流式传输时持续滚动到底部
-                        if newValue, let lastMessage = viewModel.messages.last {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
-                    }
+            contentView
+                .navigationTitle("AI 对话")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    toolbarContent
                 }
+        }
+    }
 
-                Divider()
+    private var contentView: some View {
+        VStack(spacing: 0) {
+            messageListView
+            Divider()
+            inputArea
+        }
+    }
 
-                // 输入区域
-                inputArea
+    private var messageListView: some View {
+        ScrollViewReader { proxy in
+            messagesScrollView(proxy: proxy)
+        }
+    }
+
+    private func messagesScrollView(proxy: ScrollViewProxy) -> some View {
+        ScrollView {
+            messageList
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isInputFocused = false
+        }
+        .onChange(of: viewModel.messages.count) { _, _ in
+            scrollToBottom(proxy: proxy)
+        }
+        .onChange(of: viewModel.isStreaming) { _, _ in
+            if viewModel.isStreaming {
+                scrollToBottom(proxy: proxy, animated: false)
             }
-            .navigationTitle("AI 对话")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: viewModel.clearChat) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
-                    }
-                    .disabled(viewModel.messages.isEmpty || viewModel.isStreaming)
+        }
+    }
+
+    private var messageList: some View {
+        LazyVStack(spacing: 16) {
+            messageBubbles
+            streamingIndicator
+        }
+        .padding()
+    }
+
+    private var messageBubbles: some View {
+        ForEach(viewModel.messages) { message in
+            MessageBubble(message: message)
+                .id(message.id)
+        }
+    }
+
+    private var streamingIndicator: some View {
+        Group {
+            if viewModel.isStreaming {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("正在思考...")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
+                .padding()
             }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button(action: viewModel.clearChat) {
+                Image(systemName: "trash")
+                    .foregroundColor(.red)
+            }
+            .disabled(viewModel.messages.isEmpty || viewModel.isStreaming)
         }
     }
 
@@ -113,69 +136,100 @@ struct ChatView: View {
     private var canSendMessage: Bool {
         !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+
+    private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
+        guard let lastMessage = viewModel.messages.last else { return }
+        if animated {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            }
+        } else {
+            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+        }
+    }
 }
 
 // MARK: - 消息气泡
 
-struct MessageBubble: View {
+struct MessageBubble: View, Equatable {
     let message: ChatMessage
 
     var body: some View {
-        GeometryReader { geometry in
-            HStack {
-                if message.role == .user {
-                    Spacer(minLength: 60)
-                }
+        HStack {
+            if message.role == .user {
+                Spacer(minLength: 60)
+            }
 
-                VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
-                    // 角色标签
-                    Text(roleLabel)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
+            messageContent
 
-                    // 消息内容
-                    if message.role == .user {
-                        // 用户消息使用普通文本
-                        Text(message.content)
-                            .font(.body)
-                            .foregroundColor(.white)
-                            .padding(12)
-                            .background(backgroundColor)
-                            .cornerRadius(16)
-                    } else {
-                        // AI 助手消息使用 Markdown 渲染
-                        Markdown(message.content)
-                            .markdownTheme(.bubble)
-                            .padding(12)
-                            .background(backgroundColor)
-                            .cornerRadius(16)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .stroke(borderColor, lineWidth: 0.5)
-                            )
-                    }
-
-                    // 流式传输指示器
-                    if message.isStreaming {
-                        HStack(spacing: 4) {
-                            ProgressView()
-                                .scaleEffect(0.6)
-                            Text("输入中...")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 8)
-                    }
-                }
-                .frame(maxWidth: geometry.size.width * 0.75, alignment: message.role == .user ? .trailing : .leading)
-
-                if message.role == .assistant {
-                    Spacer(minLength: 60)
-                }
+            if message.role == .assistant {
+                Spacer(minLength: 60)
             }
         }
-        .frame(height: 1) // Collapse to intrinsic content height
+    }
+
+    private var messageContent: some View {
+        VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
+            roleLabelView
+            messageContentView
+            streamingIndicator
+        }
+        .frame(maxWidth: 300, alignment: message.role == .user ? .trailing : .leading)
+    }
+
+    private var roleLabelView: some View {
+        Text(roleLabel)
+            .font(.caption2)
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 8)
+    }
+
+    @ViewBuilder
+    private var messageContentView: some View {
+        if message.role == .user {
+            userMessageView
+        } else {
+            assistantMessageView
+        }
+    }
+
+    private var userMessageView: some View {
+        Text(message.content)
+            .font(.body)
+            .foregroundColor(.white)
+            .padding(12)
+            .background(backgroundColor)
+            .cornerRadius(16)
+    }
+
+    private var assistantMessageView: some View {
+        Markdown(message.content)
+            .markdownTheme(.bubble)
+            .padding(12)
+            .background(backgroundColor)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(borderColor, lineWidth: 0.5)
+            )
+    }
+
+    @ViewBuilder
+    private var streamingIndicator: some View {
+        if message.isStreaming {
+            HStack(spacing: 4) {
+                ProgressView()
+                    .scaleEffect(0.6)
+                Text("输入中...")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 8)
+        }
+    }
+
+    static func == (lhs: MessageBubble, rhs: MessageBubble) -> Bool {
+        lhs.message == rhs.message
     }
 
     private var roleLabel: String {

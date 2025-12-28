@@ -15,7 +15,7 @@ public enum MessageRole: String, Sendable {
 }
 
 /// 聊天消息领域模型
-public struct ChatMessage: Identifiable, Sendable {
+public struct ChatMessage: Identifiable, Sendable, Equatable {
     public let id: String
     public let role: MessageRole
     public var content: String
@@ -34,6 +34,13 @@ public struct ChatMessage: Identifiable, Sendable {
         self.content = content
         self.timestamp = timestamp
         self.isStreaming = isStreaming
+    }
+
+    public static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.role == rhs.role &&
+        lhs.content == rhs.content &&
+        lhs.isStreaming == rhs.isStreaming
     }
 
     /// 从DTO创建用户消息

@@ -26,6 +26,11 @@ final class ChatViewModel {
     var isStreaming: Bool = false  // 是否正在接收流式响应
     var inputText: String = ""     // 用户输入的文本
 
+    // 流式更新节流 - 私有状态，不触发观察
+    private var streamingContent: String = ""
+    private var lastUpdateTime: Date = .distantPast
+    private let updateInterval: TimeInterval = 0.08  // 80ms 更新一次（约12fps）
+
     // 配置
     private let model: String = "glm-4.7"
     private let temperature: Double? = 0.7
@@ -87,16 +92,25 @@ final class ChatViewModel {
                 temperature: temperature
             )
 
-            // 逐块接收并更新UI
-            var fullContent = ""
-            for try await chunk in stream {
-                fullContent += chunk
+            // 重置流式状态
+            streamingContent = ""
+            lastUpdateTime = .distantPast
 
-                // 更新最后一条消息的内容
-                if let index = messages.indices.last {
-                    messages[index].content = fullContent
-                    currentSession.messages[index].content = fullContent
+            // 逐块接收并更新UI（带节流）
+            for try await chunk in stream {
+                streamingContent += chunk
+
+                // 节流：只在时间间隔到达时更新UI
+                let now = Date()
+                if now.timeIntervalSince(lastUpdateTime) >= updateInterval {
+                    lastUpdateTime = now
+                    await updateStreamingContent()
                 }
+            }
+
+            // 确保最后的内容被更新
+            if !streamingContent.isEmpty {
+                await updateStreamingContent()
             }
 
             // 流式传输完成
@@ -119,6 +133,15 @@ final class ChatViewModel {
 
             LogTool.shared.error("聊天请求失败: \(error)")
         }
+    }
+
+    /// 更新流式内容到UI（从后台上下文调用时需要在主线程）
+    private func updateStreamingContent() async {
+        guard let index = messages.indices.last else { return }
+
+        // 只更新内容，避免触发整个数组变化
+        messages[index].content = streamingContent
+        currentSession.messages[index].content = streamingContent
     }
 
     // MARK: - 其他操作
