@@ -11,7 +11,7 @@ import Alamofire
 public struct GetPhotoListEndpoint: APIEndpoint {
     public init() {}
 
-    public var path: String { "/api/v1/photo/list" }
+    public var path: String { "/api/v1/daily_photograph/user/b33ed0ca-6a5d-41a6-9e99-0c9d1db621ea" }
     public var method: HTTPMethod { .get }
     public var encoder: ParameterEncoder { URLEncodedFormParameterEncoder.default }
     public var requiresAuth: Bool { false }

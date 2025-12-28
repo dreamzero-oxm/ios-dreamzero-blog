@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		448ACF652F015B7800E56C81 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 448ACF642F015B7800E56C81 /* Secrets.xcconfig */; };
+		44A7AFEF2EFBA9480081932E /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 44A7AFEE2EFBA9480081932E /* MarkdownUI */; };
 		44D1342B2EAF3254003004F5 /* Factory in Frameworks */ = {isa = PBXBuildFile; productRef = 44D1342A2EAF3254003004F5 /* Factory */; };
 		44EFA5E72EABAF4F009BB169 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 44EFA5E62EABAF4F009BB169 /* Kingfisher */; };
 		44EFA5EA2EABAF59009BB169 /* KeychainAccess in Frameworks */ = {isa = PBXBuildFile; productRef = 44EFA5E92EABAF59009BB169 /* KeychainAccess */; };
@@ -15,6 +17,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		448ACF642F015B7800E56C81 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		44EFA5D12EABAE7A009BB169 /* DreamzeroBlog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DreamzeroBlog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -34,6 +37,7 @@
 				44EFA5EA2EABAF59009BB169 /* KeychainAccess in Frameworks */,
 				44D1342B2EAF3254003004F5 /* Factory in Frameworks */,
 				44EFA62B2EABE9D7009BB169 /* Alamofire in Frameworks */,
+				44A7AFEF2EFBA9480081932E /* MarkdownUI in Frameworks */,
 				44EFA5E72EABAF4F009BB169 /* Kingfisher in Frameworks */,
 				44EFA5ED2EABB086009BB169 /* SwiftyBeaver in Frameworks */,
 			);
@@ -47,6 +51,7 @@
 			children = (
 				44EFA5D32EABAE7A009BB169 /* DreamzeroBlog */,
 				44EFA5D22EABAE7A009BB169 /* Products */,
+				448ACF642F015B7800E56C81 /* Secrets.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -83,6 +88,7 @@
 				44EFA5EC2EABB086009BB169 /* SwiftyBeaver */,
 				44EFA62A2EABE9D7009BB169 /* Alamofire */,
 				44D1342A2EAF3254003004F5 /* Factory */,
+				44A7AFEE2EFBA9480081932E /* MarkdownUI */,
 			);
 			productName = DreamzeroBlog;
 			productReference = 44EFA5D12EABAE7A009BB169 /* DreamzeroBlog.app */;
@@ -118,6 +124,7 @@
 				44EFA5EB2EABB086009BB169 /* XCRemoteSwiftPackageReference "SwiftyBeaver" */,
 				44EFA6292EABE9D7009BB169 /* XCRemoteSwiftPackageReference "Alamofire" */,
 				44D134292EAF3254003004F5 /* XCRemoteSwiftPackageReference "Factory" */,
+				44A7AFED2EFBA9480081932E /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 44EFA5D22EABAE7A009BB169 /* Products */;
@@ -134,6 +141,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				448ACF652F015B7800E56C81 /* Secrets.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -152,6 +160,7 @@
 /* Begin XCBuildConfiguration section */
 		44EFA5DC2EABAE7B009BB169 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 448ACF642F015B7800E56C81 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -203,6 +212,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_FILE = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -216,6 +226,7 @@
 		};
 		44EFA5DD2EABAE7B009BB169 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 448ACF642F015B7800E56C81 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -261,6 +272,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_FILE = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -363,6 +375,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		44A7AFED2EFBA9480081932E /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
 		44D134292EAF3254003004F5 /* XCRemoteSwiftPackageReference "Factory" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/hmlongco/Factory.git";
@@ -406,6 +426,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		44A7AFEE2EFBA9480081932E /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 44A7AFED2EFBA9480081932E /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
 		44D1342A2EAF3254003004F5 /* Factory */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 44D134292EAF3254003004F5 /* XCRemoteSwiftPackageReference "Factory" */;
