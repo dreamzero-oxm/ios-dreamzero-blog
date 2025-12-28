@@ -82,8 +82,11 @@ final class ChatViewModel {
 
     private func streamResponse(userMessage: ChatMessage) async {
         do {
-            // 只发送当前用户的问题，不包含历史对话
-            let messageDtos = [ChatMessageDto(role: .user, content: userMessage.content)]
+            // 发送最后5条消息（包含当前用户问题），保持对话上下文
+            let recentMessages = Array(messages.suffix(5).dropLast())
+            let messageDtos = recentMessages.map { msg in
+                ChatMessageDto(role: ChatRole(rawValue: msg.role.rawValue)!, content: msg.content)
+            } + [ChatMessageDto(role: .user, content: userMessage.content)]
 
             // 获取流式响应
             let stream = try await repository.streamChat(

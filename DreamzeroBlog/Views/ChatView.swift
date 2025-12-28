@@ -63,7 +63,7 @@ struct ChatView: View {
     private var messageList: some View {
         LazyVStack(spacing: 16) {
             messageBubbles
-            streamingIndicator
+//            streamingIndicator
         }
         .padding()
     }
@@ -127,6 +127,10 @@ struct ChatView: View {
                 .disabled(!canSendMessage || viewModel.isStreaming)
             }
             .padding()
+            Text("内容由AI生成，请仔细甄别")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .padding(.bottom, 4)
         }
         .background(Color(.systemBackground))
     }
