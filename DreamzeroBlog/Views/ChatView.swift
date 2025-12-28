@@ -6,14 +6,14 @@
 //
 
 import SwiftUI
+import Factory
 
 struct ChatView: View {
     @State private var viewModel: ChatViewModel
-    @State private var scrollToBottom: Bool = false
     @FocusState private var isInputFocused: Bool
 
-    init(container: Container = .shared) {
-        _viewModel = State(initialValue: container.chatViewModel())
+    init(viewModel: ChatViewModel = Container.shared.chatViewModel()) {
+        self._viewModel = State(initialValue: viewModel)
     }
 
     var body: some View {

@@ -9,7 +9,7 @@ import Foundation
 import Alamofire
 
 /// 智谱AI API基础URL
-public let ZHIPU_AI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
+public let ZHIPU_AI_BASE_URL = "https://open.bigmodel.cn/api/coding/paas/v4"
 
 // MARK: - 聊天补全接口
 
@@ -51,13 +51,22 @@ public struct ChatCompletionEndpoint: APIEndpoint {
     }
 
     /// 智谱AI需要Bearer Token格式的Authorization header
+    /// API Key 需要转换为 JWT Token
     public var headers: HTTPHeaders? {
         var headers = HTTPHeaders()
         headers.add(.contentType("application/json"))
 
-        // 如果提供了API Key，添加Authorization header
-        if let apiKey = apiKey {
-            headers.add(.authorization(bearerToken: apiKey))
+        // 如果提供了API Key，生成JWT Token并添加Authorization header
+        if let apiKey = apiKey, !apiKey.isEmpty {
+            do {
+                let token = try ZhipuAIJWT.generateToken(from: apiKey)
+                headers.add(.authorization(bearerToken: token))
+                LogTool.shared.debug("🔐 已生成智谱AI JWT Token")
+            } catch {
+                LogTool.shared.error("生成智谱AI Token失败: \(error)")
+                // 失败时仍尝试使用原始 API Key
+                headers.add(.authorization(bearerToken: apiKey))
+            }
         }
 
         return headers

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		448ACF652F015B7800E56C81 /* Secrets.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 448ACF642F015B7800E56C81 /* Secrets.xcconfig */; };
 		44A7AFEF2EFBA9480081932E /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = 44A7AFEE2EFBA9480081932E /* MarkdownUI */; };
 		44D1342B2EAF3254003004F5 /* Factory in Frameworks */ = {isa = PBXBuildFile; productRef = 44D1342A2EAF3254003004F5 /* Factory */; };
 		44EFA5E72EABAF4F009BB169 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 44EFA5E62EABAF4F009BB169 /* Kingfisher */; };
@@ -16,6 +17,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		448ACF642F015B7800E56C81 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		44EFA5D12EABAE7A009BB169 /* DreamzeroBlog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DreamzeroBlog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -49,6 +51,7 @@
 			children = (
 				44EFA5D32EABAE7A009BB169 /* DreamzeroBlog */,
 				44EFA5D22EABAE7A009BB169 /* Products */,
+				448ACF642F015B7800E56C81 /* Secrets.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -138,6 +141,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				448ACF652F015B7800E56C81 /* Secrets.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -156,6 +160,7 @@
 /* Begin XCBuildConfiguration section */
 		44EFA5DC2EABAE7B009BB169 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 448ACF642F015B7800E56C81 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -207,6 +212,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_FILE = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -220,6 +226,7 @@
 		};
 		44EFA5DD2EABAE7B009BB169 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 448ACF642F015B7800E56C81 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -265,6 +272,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				INFOPLIST_FILE = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;

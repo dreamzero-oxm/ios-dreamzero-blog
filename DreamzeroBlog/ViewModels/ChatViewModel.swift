@@ -9,6 +9,7 @@ import Foundation
 import Observation
 import Factory
 
+@MainActor
 @Observable
 final class ChatViewModel {
     enum State {
@@ -26,7 +27,7 @@ final class ChatViewModel {
     var inputText: String = ""     // 用户输入的文本
 
     // 配置
-    private let model: String = "glm-4"
+    private let model: String = "glm-4.7"
     private let temperature: Double? = 0.7
 
     // 依赖
@@ -68,18 +69,16 @@ final class ChatViewModel {
         state = .loading
 
         Task {
-            await streamResponse()
+            await streamResponse(userMessage: userMessage)
         }
     }
 
     // MARK: - 流式接收响应
 
-    private func streamResponse() async {
+    private func streamResponse(userMessage: ChatMessage) async {
         do {
-            // 将消息转换为DTO格式
-            let messageDtos = currentSession.messages.map { msg in
-                ChatMessageDto(role: ChatRole(rawValue: msg.role.rawValue)!, content: msg.content)
-            }
+            // 只发送当前用户的问题，不包含历史对话
+            let messageDtos = [ChatMessageDto(role: .user, content: userMessage.content)]
 
             // 获取流式响应
             let stream = try await repository.streamChat(
@@ -93,38 +92,32 @@ final class ChatViewModel {
             for try await chunk in stream {
                 fullContent += chunk
 
-                await MainActor.run {
-                    // 更新最后一条消息的内容
-                    if let index = messages.indices.last {
-                        messages[index].content = fullContent
-                        currentSession.messages[index].content = fullContent
-                    }
+                // 更新最后一条消息的内容
+                if let index = messages.indices.last {
+                    messages[index].content = fullContent
+                    currentSession.messages[index].content = fullContent
                 }
             }
 
             // 流式传输完成
-            await MainActor.run {
-                if let index = messages.indices.last {
-                    messages[index].isStreaming = false
-                    currentSession.messages[index].isStreaming = false
-                }
-                self.isStreaming = false
-                self.state = .loaded
+            if let index = messages.indices.last {
+                messages[index].isStreaming = false
+                currentSession.messages[index].isStreaming = false
             }
+            self.isStreaming = false
+            self.state = .loaded
 
         } catch {
-            await MainActor.run {
-                // 移除正在流式传输的消息
-                if !messages.isEmpty && messages.last?.isStreaming == true {
-                    messages.removeLast()
-                    currentSession.messages.removeLast()
-                }
-
-                self.isStreaming = false
-                self.state = .failed(error.localizedDescription)
-
-                LogTool.shared.error("聊天请求失败: \(error)")
+            // 移除正在流式传输的消息
+            if !messages.isEmpty && messages.last?.isStreaming == true {
+                messages.removeLast()
+                currentSession.messages.removeLast()
             }
+
+            self.isStreaming = false
+            self.state = .failed(error.localizedDescription)
+
+            LogTool.shared.error("聊天请求失败: \(error)")
         }
     }
 

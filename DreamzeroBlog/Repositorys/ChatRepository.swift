@@ -30,7 +30,6 @@ protocol ChatRepositoryType {
 final class ChatRepository: ChatRepositoryType {
     private let client: APIClient
     private let apiKey: String
-    private let zhipuBaseURL = "https://open.bigmodel.cn/api/paas/v4"
 
     init(client: APIClient, apiKey: String) {
         self.client = client
@@ -42,6 +41,9 @@ final class ChatRepository: ChatRepositoryType {
         model: String = "glm-4.7",
         temperature: Double? = nil
     ) async throws -> AsyncThrowingStream<String, Error> {
+        // 调试日志：检查 API Key
+        LogTool.shared.debug("🔑 使用 API Key: \(apiKey.isEmpty ? "空" : apiKey.prefix(20) + "...")")
+
         // 创建Endpoint（包含API Key）
         let endpoint = ChatCompletionEndpoint(
             model: model,
@@ -52,7 +54,7 @@ final class ChatRepository: ChatRepositoryType {
         )
 
         // 获取智谱AI的baseURL
-        guard let zhipuURL = URL(string: zhipuBaseURL) else {
+        guard let zhipuURL = URL(string: ZHIPU_AI_BASE_URL) else {
             throw APIError.invalidResponse
         }
 

@@ -15,12 +15,12 @@ public enum MessageRole: String, Sendable {
 }
 
 /// 聊天消息领域模型
-public struct ChatMessage: Identifiable, Hashable, Sendable {
+public struct ChatMessage: Identifiable, Sendable {
     public let id: String
     public let role: MessageRole
-    public let content: String
+    public var content: String
     public let timestamp: Date
-    public let isStreaming: Bool  // 是否正在流式生成中
+    public var isStreaming: Bool  // 是否正在流式生成中
 
     public init(
         id: String = UUID().uuidString,

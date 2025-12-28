@@ -107,9 +107,16 @@ public final class APIClient {
 
                     // 检查状态码
                     guard httpResponse.statusCode == 200 else {
-                        if let data = try? await Data(collecting: bytes upTo: 1000),
-                           let errorMessage = String(data: data, encoding: .utf8) {
+                        // 读取前 1000 字节用于错误信息
+                        var errorData = Data()
+                        for try await byte in bytes {
+                            errorData.append(byte)
+                            if errorData.count >= 1000 { break }
+                        }
+                        if let errorMessage = String(data: errorData, encoding: .utf8) {
                             LogTool.shared.error("流式请求失败: \(errorMessage)")
+                            
+                            LogTool.shared.debug("API URL: \(urlRequest.url?.absoluteString ?? "unknown")")
                         }
                         continuation.finish(throwing: APIError.server(code: httpResponse.statusCode, message: APIClient.extractMessage(data: nil)))
                         return
