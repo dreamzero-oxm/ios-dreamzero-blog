@@ -33,9 +33,17 @@ struct ChatSessionListView: View {
                 Button(action: { onSelectSession(session) }) {
                     ChatSessionCell(session: session)
                 }
+                .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        onDeleteSession(session)
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                }
+                .contextMenu {
                     Button(role: .destructive) {
                         onDeleteSession(session)
                     } label: {
