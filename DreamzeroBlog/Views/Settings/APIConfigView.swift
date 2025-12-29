@@ -9,11 +9,13 @@ import SwiftUI
 
 /// API配置视图
 struct APIConfigView: View {
-    @State private var viewModel = SettingsViewModel()
     @State private var formViewModel: APIConfigViewModel
     @State private var showAPIKey = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var isTesting = false
+    @State private var isSaving = false
+    @State private var testResult: String?
     @FocusState private var focusedField: Field?
 
     enum Field {
@@ -132,7 +134,7 @@ struct APIConfigView: View {
                 }) {
                     HStack {
                         Spacer()
-                        if viewModel.isTesting {
+                        if isTesting {
                             ProgressView()
                         } else {
                             Text("测试连接")
@@ -140,14 +142,13 @@ struct APIConfigView: View {
                         Spacer()
                     }
                 }
-                .disabled(formViewModel.apiKey.isEmpty || viewModel.isTesting)
+                .disabled(isTesting)
 
                 Button(action: saveConfiguration) {
                     HStack {
                         Spacer()
-                        if viewModel.isSaving {
+                        if isSaving {
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
                             Text("保存配置")
                                 .foregroundStyle(.white)
@@ -156,13 +157,13 @@ struct APIConfigView: View {
                     }
                 }
                 .listRowBackground(formViewModel.apiKey.isEmpty ? Color.gray : Color.blue)
-                .disabled(formViewModel.apiKey.isEmpty || viewModel.isSaving)
+                .disabled(isSaving)
             } header: {
                 Text("操作")
             }
 
             // 测试结果
-            if let testResult = viewModel.testResult {
+            if let testResult = testResult {
                 Section {
                     Text(testResult)
                         .foregroundStyle(testResult.contains("通过") ? .green : .red)
@@ -174,7 +175,7 @@ struct APIConfigView: View {
             // 重置选项
             Section {
                 Button(action: {
-                    viewModel.resetToDefaults()
+                    APIConfigurationStore.shared.resetToDefaults()
                     updateFormViewModel()
                 }) {
                     Text("重置为默认配置")
@@ -182,7 +183,7 @@ struct APIConfigView: View {
                 }
 
                 Button(action: {
-                    viewModel.resetToBundle()
+                    APIConfigurationStore.shared.resetToBundle()
                     updateFormViewModel()
                 }) {
                     Text("重置为Bundle配置")
@@ -205,14 +206,11 @@ struct APIConfigView: View {
             // 页面打开时刷新配置
             updateFormViewModel()
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            // 点击输入框外区域解除焦点
-            focusedField = nil
-        }
-        .onChange(of: formViewModel.selectedProvider) { _, _ in
-            // 服务商变化时自动保存
-            autoSave()
+        .onChange(of: formViewModel.selectedProvider) { _, newValue in
+            // 切换provider时更新Store的currentProvider
+            APIConfigurationStore.shared.currentProvider = newValue
+            // 重新加载该provider的配置
+            updateFormViewModel()
         }
         .onChange(of: formViewModel.apiURL) { _, _ in
             autoSave()
@@ -241,35 +239,87 @@ struct APIConfigView: View {
     // MARK: - Actions
 
     private func testConnection() async {
-        // 更新viewModel配置
-        viewModel.apiConfiguration = formViewModel.buildConfiguration() ?? viewModel.apiConfiguration
+        isTesting = true
+        testResult = nil
 
-        let success = await viewModel.testConnection()
-
-        await MainActor.run {
-            if success {
-                alertMessage = viewModel.testResult ?? "连接测试成功"
-            } else {
-                alertMessage = viewModel.testResult ?? "连接测试失败"
-            }
+        guard let config = formViewModel.buildConfiguration() else {
+            testResult = formViewModel.validationError ?? "配置验证失败"
+            isTesting = false
+            alertMessage = testResult ?? "配置验证失败"
             showAlert = true
+            return
         }
+
+        // 简单验证配置有效性
+        guard !config.apiURL.isEmpty else {
+            testResult = "请输入API URL"
+            isTesting = false
+            alertMessage = testResult ?? "请输入API URL"
+            showAlert = true
+            return
+        }
+
+        guard !config.apiKey.isEmpty else {
+            testResult = "请输入API Key"
+            isTesting = false
+            alertMessage = testResult ?? "请输入API Key"
+            showAlert = true
+            return
+        }
+
+        guard !config.model.isEmpty else {
+            testResult = "请输入模型名称"
+            isTesting = false
+            alertMessage = testResult ?? "请输入模型名称"
+            showAlert = true
+            return
+        }
+
+        // 验证URL格式
+        guard URL(string: config.apiURL) != nil else {
+            testResult = "API URL格式不正确"
+            isTesting = false
+            alertMessage = testResult ?? "API URL格式不正确"
+            showAlert = true
+            return
+        }
+
+        // 如果是智谱AI且开启了JWT，验证API Key格式
+        if (config.provider == .zhipuAI || config.provider == .zhipuAIPlan) && config.useJWT {
+            let parts = config.apiKey.split(separator: ".")
+            if parts.count != 2 {
+                testResult = "智谱AI API Key格式应为 id.secret"
+                isTesting = false
+                alertMessage = testResult ?? "智谱AI API Key格式应为 id.secret"
+                showAlert = true
+                return
+            }
+        }
+
+        testResult = "配置验证通过"
+        isTesting = false
+        alertMessage = testResult ?? "配置验证通过"
+        showAlert = true
     }
 
     private func saveConfiguration() {
-        guard let newConfig = formViewModel.buildConfiguration() else {
+        guard let config = formViewModel.buildConfiguration() else {
             alertMessage = formViewModel.validationError ?? "配置验证失败"
             showAlert = true
             return
         }
 
-        viewModel.saveConfiguration()
+        isSaving = true
+        APIConfigurationStore.shared.saveConfiguration(config)
+        isSaving = false
+
         alertMessage = "配置已保存"
         showAlert = true
     }
 
     private func updateFormViewModel() {
-        formViewModel = APIConfigViewModel(configuration: viewModel.apiConfiguration)
+        let store = APIConfigurationStore.shared
+        formViewModel = APIConfigViewModel(configuration: store.currentConfiguration)
     }
 
     private func autoSave() {
@@ -278,8 +328,6 @@ struct APIConfigView: View {
         }
         // 自动保存到Store
         APIConfigurationStore.shared.saveConfiguration(config)
-        // 同时更新viewModel
-        viewModel.apiConfiguration = config
         LogTool.shared.debug("✅ API配置已自动保存")
     }
 }

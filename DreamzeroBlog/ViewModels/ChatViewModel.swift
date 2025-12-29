@@ -216,8 +216,50 @@ final class ChatViewModel {
             }
 
             self.isStreaming = false
-            self.state = .failed(error.localizedDescription)
 
+            // 解析错误信息
+            let errorMessage: String
+            if let apiError = error as? APIError {
+                switch apiError {
+                case .network(let afError):
+                    errorMessage = "网络错误: \(afError.localizedDescription)"
+                case .unauthorized:
+                    errorMessage = "认证失败，请检查API Key是否正确"
+                case .server(let code, let msg):
+                    if code == 1001 {
+                        errorMessage = "认证失败：Header中未收到Authorization参数，请检查API配置"
+                    } else {
+                        errorMessage = msg ?? "服务器错误(\(code))"
+                    }
+                case .invalidResponse:
+                    errorMessage = "响应格式错误，请检查API配置是否正确"
+                case .decoding:
+                    errorMessage = "数据解析失败"
+                case .cancelled:
+                    errorMessage = "请求已取消"
+                case .unknown(let e):
+                    errorMessage = e.localizedDescription
+                }
+            } else {
+                // 对于非APIError，尝试从错误描述中提取信息
+                let errorDesc = error.localizedDescription
+                if errorDesc.contains("Authorization") || errorDesc.contains("1001") {
+                    errorMessage = "认证失败：Header中未收到Authorization参数，请检查API配置"
+                } else if errorDesc.contains("网络") || errorDesc.contains("network") {
+                    errorMessage = "网络连接失败，请检查网络设置"
+                } else if errorDesc.contains("timeout") || errorDesc.contains("超时") {
+                    errorMessage = "请求超时，请稍后再试"
+                } else {
+                    errorMessage = "请求失败: \(errorDesc)"
+                }
+            }
+
+            // 添加错误消息气泡
+            let errorBubble = ChatMessage(role: .system, content: errorMessage)
+            messages.append(errorBubble)
+            currentSession.messages.append(errorBubble)
+
+            self.state = .failed(errorMessage)
             LogTool.shared.error("聊天请求失败: \(error)")
         }
     }

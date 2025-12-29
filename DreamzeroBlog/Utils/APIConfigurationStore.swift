@@ -14,86 +14,122 @@ final class APIConfigurationStore {
     /// 单例
     static let shared = APIConfigurationStore()
 
-    /// 当前配置
-    var currentConfiguration: APIConfiguration
+    /// 当前选中的服务商
+    var currentProvider: APIProvider
+
+    /// 所有provider的配置字典
+    private var configurations: [String: APIConfiguration] = [:]
+
+    /// 当前配置（计算属性）
+    var currentConfiguration: APIConfiguration {
+        get {
+            configurations[currentProvider.rawValue] ?? preset(for: currentProvider)
+        }
+        set {
+            configurations[currentProvider.rawValue] = newValue
+        }
+    }
 
     private init() {
-        self.currentConfiguration = Self.loadConfiguration()
+        self.currentProvider = .zhipuAI
+        loadAllConfigurations()
     }
 
     // MARK: - Key Keys
 
-    private static let keyProvider = "API_CONFIG_PROVIDER"
-    private static let keyAPIURL = "API_CONFIG_URL"
-    private static let keyAPIKey = "API_CONFIG_KEY"
-    private static let keyModel = "API_CONFIG_MODEL"
-    private static let keyUseJWT = "API_CONFIG_USE_JWT"
+    private static func keyProvider(for provider: APIProvider) -> String {
+        "API_CONFIG_\(provider.rawValue)_PROVIDER"
+    }
+
+    private static func keyAPIURL(for provider: APIProvider) -> String {
+        "API_CONFIG_\(provider.rawValue)_URL"
+    }
+
+    private static func keyAPIKey(for provider: APIProvider) -> String {
+        "API_CONFIG_\(provider.rawValue)_KEY"
+    }
+
+    private static func keyModel(for provider: APIProvider) -> String {
+        "API_CONFIG_\(provider.rawValue)_MODEL"
+    }
+
+    private static func keyUseJWT(for provider: APIProvider) -> String {
+        "API_CONFIG_\(provider.rawValue)_USE_JWT"
+    }
 
     // MARK: - Load Configuration
 
-    /// 加载配置
-    /// 优先级: Keychain > UserDefaults > Bundle (Secrets.xcconfig) > 默认值
-    private static func loadConfiguration() -> APIConfiguration {
+    /// 加载所有provider的配置
+    private func loadAllConfigurations() {
+        for provider in APIProvider.allCases {
+            if let config = Self.loadConfiguration(for: provider) {
+                configurations[provider.rawValue] = config
+            } else {
+                // 使用预设作为默认值
+                configurations[provider.rawValue] = preset(for: provider)
+            }
+        }
+    }
+
+    /// 加载单个provider的配置
+    /// 优先级: Keychain > UserDefaults > Bundle (Secrets.xcconfig) > nil
+    private static func loadConfiguration(for provider: APIProvider) -> APIConfiguration? {
         // 1. 尝试从 Keychain 读取
-        if let config = loadFromKeychain(), config.isValid {
-            LogTool.shared.debug("✅ 已从 Keychain 加载API配置")
+        if let config = loadFromKeychain(for: provider), config.isValid {
+            LogTool.shared.debug("✅ 已从 Keychain 加载 \(provider.rawValue) API配置")
             return config
         }
 
         // 2. 尝试从 UserDefaults 读取
-        if let config = loadFromUserDefaults(), config.isValid {
-            LogTool.shared.debug("✅ 已从 UserDefaults 加载API配置")
+        if let config = loadFromUserDefaults(for: provider), config.isValid {
+            LogTool.shared.debug("✅ 已从 UserDefaults 加载 \(provider.rawValue) API配置")
             // 保存到 Keychain 以便下次使用
-            saveToKeychain(config)
+            saveToKeychain(config, for: provider)
             return config
         }
 
-        // 3. 尝试从 Bundle (Secrets.xcconfig) 读取
-        if let config = loadFromBundle(), config.isValid {
-            LogTool.shared.debug("✅ 已从 Bundle 加载API配置")
+        // 3. 尝试从 Bundle (Secrets.xcconfig) 读取（仅zhipuAI）
+        if provider == .zhipuAI, let config = loadFromBundle() {
+            LogTool.shared.debug("✅ 已从 Bundle 加载 \(provider.rawValue) API配置")
             // 保存到 Keychain
-            saveToKeychain(config)
+            saveToKeychain(config, for: provider)
             return config
         }
 
-        // 4. 返回默认配置
-        LogTool.shared.warning("⚠️ 未找到API配置，使用默认配置")
-        return APIConfiguration.default
+        return nil
     }
 
-    /// 从 Keychain 加载
-    private static func loadFromKeychain() -> APIConfiguration? {
-        guard let providerRaw = KeychainHelper.read(key: keyProvider),
-              let provider = APIProvider(rawValue: providerRaw),
-              let apiURL = KeychainHelper.read(key: keyAPIURL),
-              let apiKey = KeychainHelper.read(key: keyAPIKey),
-              let model = KeychainHelper.read(key: keyModel),
-              let useJWTRaw = KeychainHelper.read(key: keyUseJWT) else {
+    /// 从 Keychain 加载单个provider配置
+    private static func loadFromKeychain(for provider: APIProvider) -> APIConfiguration? {
+        guard let apiURL = KeychainHelper.read(key: keyAPIURL(for: provider)),
+              let apiKey = KeychainHelper.read(key: keyAPIKey(for: provider)),
+              let model = KeychainHelper.read(key: keyModel(for: provider)) else {
             return nil
         }
+
+        let useJWTRaw = KeychainHelper.read(key: keyUseJWT(for: provider))
+        let useJWT = useJWTRaw == "true" || useJWTRaw == "1"
 
         return APIConfiguration(
             provider: provider,
             apiURL: apiURL,
             apiKey: apiKey,
             model: model,
-            useJWT: Bool(useJWTRaw) ?? true
+            useJWT: useJWT
         )
     }
 
-    /// 从 UserDefaults 加载
-    private static func loadFromUserDefaults() -> APIConfiguration? {
+    /// 从 UserDefaults 加载单个provider配置
+    private static func loadFromUserDefaults(for provider: APIProvider) -> APIConfiguration? {
         let defaults = UserDefaults.standard
 
-        guard let providerRaw = defaults.string(forKey: keyProvider),
-              let provider = APIProvider(rawValue: providerRaw),
-              let apiURL = defaults.string(forKey: keyAPIURL),
-              let apiKey = defaults.string(forKey: keyAPIKey),
-              let model = defaults.string(forKey: keyModel) else {
+        guard let apiURL = defaults.string(forKey: keyAPIURL(for: provider)),
+              let apiKey = defaults.string(forKey: keyAPIKey(for: provider)),
+              let model = defaults.string(forKey: keyModel(for: provider)) else {
             return nil
         }
 
-        let useJWT = defaults.bool(forKey: keyUseJWT)
+        let useJWT = defaults.bool(forKey: keyUseJWT(for: provider))
 
         return APIConfiguration(
             provider: provider,
@@ -124,70 +160,95 @@ final class APIConfigurationStore {
 
     /// 保存配置
     func saveConfiguration(_ config: APIConfiguration) {
+        let provider = config.provider
+
         // 保存到 Keychain
-        Self.saveToKeychain(config)
+        Self.saveToKeychain(config, for: provider)
 
         // 保存到 UserDefaults (作为备份)
-        Self.saveToUserDefaults(config)
+        Self.saveToUserDefaults(config, for: provider)
 
-        // 更新当前配置
-        currentConfiguration = config
+        // 更新字典
+        configurations[provider.rawValue] = config
 
-        LogTool.shared.debug("✅ API配置已保存")
+        LogTool.shared.debug("✅ \(provider.rawValue) API配置已保存")
     }
 
     /// 保存到 Keychain
-    private static func saveToKeychain(_ config: APIConfiguration) {
-        KeychainHelper.save(key: keyProvider, value: config.provider.rawValue)
-        KeychainHelper.save(key: keyAPIURL, value: config.apiURL)
-        KeychainHelper.save(key: keyAPIKey, value: config.apiKey)
-        KeychainHelper.save(key: keyModel, value: config.model)
-        KeychainHelper.save(key: keyUseJWT, value: String(config.useJWT))
+    private static func saveToKeychain(_ config: APIConfiguration, for provider: APIProvider) {
+        _ = KeychainHelper.save(key: keyAPIURL(for: provider), value: config.apiURL)
+        _ = KeychainHelper.save(key: keyAPIKey(for: provider), value: config.apiKey)
+        _ = KeychainHelper.save(key: keyModel(for: provider), value: config.model)
+        _ = KeychainHelper.save(key: keyUseJWT(for: provider), value: String(config.useJWT))
     }
 
     /// 保存到 UserDefaults
-    private static func saveToUserDefaults(_ config: APIConfiguration) {
+    private static func saveToUserDefaults(_ config: APIConfiguration, for provider: APIProvider) {
         let defaults = UserDefaults.standard
-        defaults.set(config.provider.rawValue, forKey: keyProvider)
-        defaults.set(config.apiURL, forKey: keyAPIURL)
-        defaults.set(config.apiKey, forKey: keyAPIKey)
-        defaults.set(config.model, forKey: keyModel)
-        defaults.set(config.useJWT, forKey: keyUseJWT)
+        defaults.set(config.apiURL, forKey: keyAPIURL(for: provider))
+        defaults.set(config.apiKey, forKey: keyAPIKey(for: provider))
+        defaults.set(config.model, forKey: keyModel(for: provider))
+        defaults.set(config.useJWT, forKey: keyUseJWT(for: provider))
     }
 
     // MARK: - Reset
 
-    /// 重置为默认配置
-    func resetToDefaults() {
-        let defaultConfig = APIConfiguration.default
+    /// 重置指定provider为默认配置
+    func resetToDefaults(for provider: APIProvider? = nil) {
+        let targetProvider = provider ?? currentProvider
+        let defaultConfig = preset(for: targetProvider)
         saveConfiguration(defaultConfig)
-        LogTool.shared.debug("✅ API配置已重置为默认值")
+        LogTool.shared.debug("✅ \(targetProvider.rawValue) API配置已重置为默认值")
     }
 
-    /// 重置为Bundle配置
-    func resetToBundle() {
-        if let bundleConfig = Self.loadFromBundle() {
-            saveConfiguration(bundleConfig)
-            LogTool.shared.debug("✅ API配置已重置为Bundle配置")
+    /// 重置指定provider为Bundle配置
+    func resetToBundle(for provider: APIProvider? = nil) {
+        let targetProvider = provider ?? currentProvider
+
+        // 只有zhipuAI支持从Bundle重置
+        guard targetProvider == .zhipuAI,
+              let bundleConfig = Self.loadFromBundle() else {
+            LogTool.shared.warning("⚠️ 只有智谱AI支持从Bundle重置")
+            return
         }
+
+        saveConfiguration(bundleConfig)
+        LogTool.shared.debug("✅ \(targetProvider.rawValue) API配置已重置为Bundle配置")
     }
 
-    /// 清除配置
+    /// 清除所有配置
     func clearConfiguration() {
-        KeychainHelper.delete(key: Self.keyProvider)
-        KeychainHelper.delete(key: Self.keyAPIURL)
-        KeychainHelper.delete(key: Self.keyAPIKey)
-        KeychainHelper.delete(key: Self.keyModel)
-        KeychainHelper.delete(key: Self.keyUseJWT)
+        for provider in APIProvider.allCases {
+            _ = KeychainHelper.delete(key: Self.keyProvider(for: provider))
+            _ = KeychainHelper.delete(key: Self.keyAPIURL(for: provider))
+            _ = KeychainHelper.delete(key: Self.keyAPIKey(for: provider))
+            _ = KeychainHelper.delete(key: Self.keyModel(for: provider))
+            _ = KeychainHelper.delete(key: Self.keyUseJWT(for: provider))
 
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: Self.keyProvider)
-        defaults.removeObject(forKey: Self.keyAPIURL)
-        defaults.removeObject(forKey: Self.keyAPIKey)
-        defaults.removeObject(forKey: Self.keyModel)
-        defaults.removeObject(forKey: Self.keyUseJWT)
+            let defaults = UserDefaults.standard
+            defaults.removeObject(forKey: Self.keyProvider(for: provider))
+            defaults.removeObject(forKey: Self.keyAPIURL(for: provider))
+            defaults.removeObject(forKey: Self.keyAPIKey(for: provider))
+            defaults.removeObject(forKey: Self.keyModel(for: provider))
+            defaults.removeObject(forKey: Self.keyUseJWT(for: provider))
+        }
 
+        configurations.removeAll()
         currentConfiguration = APIConfiguration.empty
         LogTool.shared.debug("✅ API配置已清除")
+    }
+
+    // MARK: - Helpers
+
+    /// 获取provider的预设配置
+    private func preset(for provider: APIProvider) -> APIConfiguration {
+        let preset = APIProviderPreset.preset(for: provider)
+        return APIConfiguration(
+            provider: provider,
+            apiURL: preset.apiURL,
+            apiKey: "",
+            model: preset.defaultModel,
+            useJWT: provider.supportsJWT
+        )
     }
 }

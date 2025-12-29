@@ -10,9 +10,9 @@ import Foundation
 
 extension Container {
     /// API配置
-    /// 使用 .cached 确保配置变化时能够及时更新
+    /// 不使用 .cached，确保每次获取最新配置
     var apiConfiguration: Factory<APIConfiguration> {
-        self { APIConfigurationStore.shared.currentConfiguration }.cached
+        self { APIConfigurationStore.shared.currentConfiguration }
     }
 
     /// 智谱AI API Key（向后兼容）
