@@ -31,4 +31,15 @@ extension Container {
             )
         }
     }
+
+    // MARK: - 注意
+    // ChatSessionStore 需要在 View 层通过 @Environment(\.modelContext) 获取 ModelContext
+    // 然后直接创建 ChatSessionStore(modelContext: modelContext)
+    // 这是因为 Factory 无法直接注入 SwiftUI 的 Environment 变量
+    //
+    // 使用示例：
+    // @Environment(\.modelContext) private var modelContext
+    // private var sessionStore: ChatSessionStore {
+    //     ChatSessionStore(modelContext: modelContext)
+    // }
 }

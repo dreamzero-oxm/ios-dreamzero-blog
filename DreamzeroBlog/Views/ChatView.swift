@@ -8,13 +8,24 @@
 import SwiftUI
 import Factory
 import MarkdownUI
+import SwiftData
 
 struct ChatView: View {
-    @State private var viewModel: ChatViewModel
     @FocusState private var isInputFocused: Bool
 
-    init(viewModel: ChatViewModel = Container.shared.chatViewModel()) {
-        self._viewModel = State(initialValue: viewModel)
+    @Environment(\.modelContext) private var modelContext
+    @State private var showSessionList: Bool = false
+
+    // 使用 Factory 创建的 ViewModel（不带 sessionStore）
+    @State private var baseViewModel: ChatViewModel = Container.shared.chatViewModel()
+
+    // 创建带 sessionStore 的 ViewModel
+    private var viewModel: ChatViewModel {
+        let sessionStore = ChatSessionStore(modelContext: modelContext)
+        return ChatViewModel(
+            repository: Container.shared.chatRepository(),
+            sessionStore: sessionStore
+        )
     }
 
     var body: some View {
@@ -25,7 +36,31 @@ struct ChatView: View {
                 .toolbar {
                     toolbarContent
                 }
+                .sheet(isPresented: $showSessionList) {
+                    SessionListSheet(
+                        modelContext: modelContext,
+                        baseViewModel: $baseViewModel
+                    )
+                }
         }
+        .onAppear {
+            // 初始化时同步 baseViewModel 的状态
+            syncViewModel()
+        }
+    }
+
+    private func syncViewModel() {
+        let sessionStore = ChatSessionStore(modelContext: modelContext)
+        let vm = ChatViewModel(
+            repository: Container.shared.chatRepository(),
+            sessionStore: sessionStore
+        )
+        vm.messages = baseViewModel.messages
+        vm.currentSession = baseViewModel.currentSession
+        vm.state = baseViewModel.state
+        vm.isStreaming = baseViewModel.isStreaming
+        vm.inputText = baseViewModel.inputText
+        baseViewModel = vm
     }
 
     private var contentView: some View {
@@ -50,11 +85,11 @@ struct ChatView: View {
         .onTapGesture {
             isInputFocused = false
         }
-        .onChange(of: viewModel.messages.count) { _, _ in
+        .onChange(of: baseViewModel.messages.count) { _, _ in
             scrollToBottom(proxy: proxy)
         }
-        .onChange(of: viewModel.isStreaming) { _, _ in
-            if viewModel.isStreaming {
+        .onChange(of: baseViewModel.isStreaming) { _, _ in
+            if baseViewModel.isStreaming {
                 scrollToBottom(proxy: proxy, animated: false)
             }
         }
@@ -62,7 +97,7 @@ struct ChatView: View {
 
     private var messageList: some View {
         Group {
-            if viewModel.messages.isEmpty {
+            if baseViewModel.messages.isEmpty {
                 EmptyStateView()
             } else {
                 LazyVStack(spacing: 16) {
@@ -74,7 +109,7 @@ struct ChatView: View {
     }
 
     private var messageBubbles: some View {
-        ForEach(viewModel.messages) { message in
+        ForEach(baseViewModel.messages) { message in
             MessageBubble(message: message)
                 .id(message.id)
         }
@@ -82,7 +117,7 @@ struct ChatView: View {
 
     private var streamingIndicator: some View {
         Group {
-            if viewModel.isStreaming {
+            if baseViewModel.isStreaming {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.8)
@@ -98,11 +133,28 @@ struct ChatView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            Button(action: viewModel.clearChat) {
-                Image(systemName: "trash")
-                    .foregroundColor(.red)
+            HStack(spacing: 16) {
+                // 新建会话按钮
+                Button(action: {
+                    Task {
+                        await baseViewModel.createNewSession()
+                    }
+                }) {
+                    Image(systemName: "plus.circle")
+                }
+
+                // 会话列表按钮
+                Button(action: { showSessionList = true }) {
+                    Image(systemName: "ellipsis.circle")
+                }
+
+                // 清空按钮
+                Button(action: baseViewModel.clearChat) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red)
+                }
+                .disabled(baseViewModel.messages.isEmpty || baseViewModel.isStreaming)
             }
-            .disabled(viewModel.messages.isEmpty || viewModel.isStreaming)
         }
     }
 
@@ -112,7 +164,7 @@ struct ChatView: View {
         VStack(spacing: 0) {
             HStack(alignment: .bottom, spacing: 12) {
                 // 文本输入框
-                TextField("输入消息...", text: $viewModel.inputText, axis: .vertical)
+                TextField("输入消息...", text: $baseViewModel.inputText, axis: .vertical)
                     .focused($isInputFocused)
                     .textFieldStyle(.plain)
                     .padding(12)
@@ -122,16 +174,18 @@ struct ChatView: View {
 
                 // 发送按钮
                 Button(action: {
-                    viewModel.sendMessage()
+                    baseViewModel.sendMessage()
                     isInputFocused = false
                 }) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 40))
                         .foregroundColor(canSendMessage ? .blue : .gray)
                 }
-                .disabled(!canSendMessage || viewModel.isStreaming)
+                .disabled(!canSendMessage || baseViewModel.isStreaming)
             }
-            .padding()
+            .padding([.horizontal, .top])
+            .padding(.bottom, 4)
+            
             Text("内容由AI生成，请仔细甄别")
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -143,11 +197,11 @@ struct ChatView: View {
     // MARK: - 辅助方法
 
     private var canSendMessage: Bool {
-        !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !baseViewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
-        guard let lastMessage = viewModel.messages.last else { return }
+        guard let lastMessage = baseViewModel.messages.last else { return }
         if animated {
             withAnimation(.easeInOut(duration: 0.3)) {
                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
@@ -357,4 +411,40 @@ struct MessageBubble: View, Equatable {
 
 #Preview {
     ChatView()
+}
+
+// MARK: - 会话列表弹窗
+
+struct SessionListSheet: View {
+    let modelContext: ModelContext
+    @Binding var baseViewModel: ChatViewModel
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ChatSessionListView(
+                onSelectSession: { session in
+                    Task {
+                        await baseViewModel.loadSession(session)
+                        dismiss()
+                    }
+                },
+                onDeleteSession: { session in
+                    Task {
+                        await baseViewModel.deleteSession(session)
+                    }
+                }
+            )
+            .navigationTitle("对话历史")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
 }
