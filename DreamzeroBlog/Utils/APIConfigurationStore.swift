@@ -15,7 +15,13 @@ final class APIConfigurationStore {
     static let shared = APIConfigurationStore()
 
     /// 当前选中的服务商
-    var currentProvider: APIProvider
+    var currentProvider: APIProvider {
+        didSet {
+            // 保存到 UserDefaults（非敏感数据）
+            UserDefaults.standard.set(currentProvider.rawValue, forKey: Self.kLastSelectedProvider)
+            LogTool.shared.debug("✅ 已保存选择的服务商: \(currentProvider.rawValue)")
+        }
+    }
 
     /// 所有provider的配置字典
     private var configurations: [String: APIConfiguration] = [:]
@@ -31,9 +37,24 @@ final class APIConfigurationStore {
     }
 
     private init() {
-        self.currentProvider = .zhipuAI
+        // 从 UserDefaults 读取上次选择的服务商
+        if let savedProviderRaw = UserDefaults.standard.string(forKey: Self.kLastSelectedProvider),
+           let savedProvider = APIProvider.allCases.first(where: { $0.rawValue == savedProviderRaw }) {
+            self.currentProvider = savedProvider
+            LogTool.shared.debug("✅ 已恢复上次选择的服务商: \(savedProvider.rawValue)")
+        } else {
+            // 首次使用，默认选择智谱AI
+            self.currentProvider = .zhipuAI
+            LogTool.shared.debug("✅ 首次使用，默认服务商: 智谱AI")
+        }
+
         loadAllConfigurations()
     }
+
+    // MARK: - Keys
+
+    /// 存储当前选中的服务商的键
+    private static let kLastSelectedProvider = "API_LAST_SELECTED_PROVIDER"
 
     // MARK: - Key Keys
 
