@@ -7,59 +7,40 @@
 
 import SwiftUI
 import SwiftData
+import Factory
 
 struct KnowledgeBaseView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var viewModel: KnowledgeBaseViewModel
     @State private var showAddDocument = false
     @State private var showChunkBrowser = false
-    @State private var uploadViewModel: DocumentUploadViewModel?
-    @State private var browserViewModel: ChunkBrowserViewModel?
 
-    init() {
-        // 创建服务和存储
-        let schema = Schema([
-            KBDocumentModel.self,
-            KBChunkModel.self
-        ])
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try! ModelContainer(for: schema, configurations: [config])
-        let context = ModelContext(container)
-
-        let store = KnowledgeBaseStore(modelContext: context)
-        let embeddingService = EmbeddingService()
-        let chunkingService = ChunkingService()
-        let vectorSearchService = VectorSearchService()
-
-        let kbViewModel = KnowledgeBaseViewModel(
-            store: store,
-            embeddingService: embeddingService,
-            chunkingService: chunkingService,
-            vectorSearchService: vectorSearchService
-        )
-
-        _viewModel = State(initialValue: kbViewModel)
-        _uploadViewModel = State(initialValue: DocumentUploadViewModel(knowledgeBaseVM: kbViewModel))
-        _browserViewModel = State(initialValue: ChunkBrowserViewModel(knowledgeBaseVM: kbViewModel))
+    // 使用依赖注入容器获取服务
+    private var knowledgeBaseStore: KnowledgeBaseStoreType {
+        KnowledgeBaseStore(modelContext: modelContext)
     }
+
+    private var embeddingService: EmbeddingServiceType {
+        Container.shared.embeddingService()
+    }
+
+    private var chunkingService: ChunkingServiceType {
+        Container.shared.chunkingService()
+    }
+
+    private var vectorSearchService: VectorSearchServiceType {
+        Container.shared.vectorSearchService()
+    }
+
+    // ViewModel 在 onAppear 中初始化
+    @State private var viewModel: KnowledgeBaseViewModel?
 
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.documents.isEmpty && (viewModel.state == .idle || viewModel.state == .loaded) {
-                    ContentUnavailableView(
-                        "暂无知识库文档",
-                        systemImage: "doc.text",
-                        description: Text("点击 + 添加文档")
-                    )
+                if let viewModel = viewModel {
+                    contentView(viewModel: viewModel)
                 } else {
-                    List {
-                        ForEach(viewModel.documents) { document in
-                            DocumentRowView(document: document)
-                                .contentShape(Rectangle())
-                        }
-                        .onDelete(perform: deleteDocuments)
-                    }
+                    ProgressView()
                 }
             }
             .navigationTitle("知识库")
@@ -80,24 +61,58 @@ struct KnowledgeBaseView: View {
                 }
             }
             .sheet(isPresented: $showAddDocument) {
-                if let uploadViewModel = uploadViewModel {
-                    DocumentUploadView(viewModel: uploadViewModel)
+                if let viewModel = viewModel {
+                    DocumentUploadView(viewModel: DocumentUploadViewModel(knowledgeBaseVM: viewModel))
                 }
             }
             .sheet(isPresented: $showChunkBrowser) {
-                if let browserViewModel = browserViewModel {
-                    ChunkBrowserView(viewModel: browserViewModel)
+                if let viewModel = viewModel {
+                    ChunkBrowserView(viewModel: ChunkBrowserViewModel(knowledgeBaseVM: viewModel))
                 }
             }
             .onAppear {
-                Task {
-                    await viewModel.loadDocuments()
-                }
+                initializeViewModel()
             }
         }
     }
 
+    @ViewBuilder
+    private func contentView(viewModel: KnowledgeBaseViewModel) -> some View {
+        if viewModel.documents.isEmpty && (viewModel.state == .idle || viewModel.state == .loaded) {
+            ContentUnavailableView(
+                "暂无知识库文档",
+                systemImage: "doc.text",
+                description: Text("点击 + 添加文档")
+            )
+        } else {
+            List {
+                ForEach(viewModel.documents) { document in
+                    DocumentRowView(document: document)
+                        .contentShape(Rectangle())
+                }
+                .onDelete(perform: deleteDocuments)
+            }
+        }
+    }
+
+    private func initializeViewModel() {
+        guard viewModel == nil else { return }
+
+        let kbViewModel = KnowledgeBaseViewModel(
+            store: knowledgeBaseStore,
+            embeddingService: embeddingService,
+            chunkingService: chunkingService,
+            vectorSearchService: vectorSearchService
+        )
+        self.viewModel = kbViewModel
+
+        Task {
+            await kbViewModel.loadDocuments()
+        }
+    }
+
     private func deleteDocuments(offsets: IndexSet) {
+        guard let viewModel = viewModel else { return }
         Task {
             for index in offsets {
                 await viewModel.deleteDocument(viewModel.documents[index])

@@ -62,7 +62,12 @@ final class ChatViewModel {
 
     // 便捷构造：从容器解析
     convenience init(container: Container = .shared) {
-        self.init(repository: container.chatRepository())
+        self.init(
+            repository: container.chatRepository(),
+            ragConfig: .shared,
+            knowledgeBaseStore: container.knowledgeBaseStore(),
+            embeddingService: container.embeddingService()
+        )
     }
 
     // MARK: - 会话管理

@@ -36,7 +36,10 @@ struct ChatView: View {
         let sessionStore = ChatSessionStore(modelContext: modelContext)
         return ChatViewModel(
             repository: Container.shared.chatRepository(),
-            sessionStore: sessionStore
+            sessionStore: sessionStore,
+            ragConfig: .shared,
+            knowledgeBaseStore: Container.shared.knowledgeBaseStore(),
+            embeddingService: Container.shared.embeddingService()
         )
     }
 
@@ -65,7 +68,10 @@ struct ChatView: View {
         let sessionStore = ChatSessionStore(modelContext: modelContext)
         let vm = ChatViewModel(
             repository: Container.shared.chatRepository(),
-            sessionStore: sessionStore
+            sessionStore: sessionStore,
+            ragConfig: .shared,
+            knowledgeBaseStore: Container.shared.knowledgeBaseStore(),
+            embeddingService: Container.shared.embeddingService()
         )
         vm.messages = baseViewModel.messages
         vm.currentSession = baseViewModel.currentSession
