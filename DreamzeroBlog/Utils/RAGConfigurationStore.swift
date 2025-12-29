@@ -81,7 +81,7 @@ final class RAGConfigurationStore {
 
     /// 默认 Prompt 模板
     let defaultPromptTemplate = """
-    基于以下知识库内容回答问题。如果知识库中没有相关信息，请忽略。
+    基于以下知识库内容回答问题。如果知识库中没有相关信息，请忽略知识库的内容。
 
     知识库内容：
     {context}

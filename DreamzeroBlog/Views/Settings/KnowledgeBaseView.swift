@@ -125,6 +125,14 @@ struct KnowledgeBaseView: View {
 struct DocumentRowView: View {
     let document: KBDocument
 
+    // 在初始化时捕获时间快照
+    private let timeSnapshot: Date
+
+    init(document: KBDocument) {
+        self.document = document
+        self.timeSnapshot = Date()
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(document.title)
@@ -138,12 +146,25 @@ struct DocumentRowView: View {
 
                 Spacer()
 
-                Text(document.updatedAt, style: .relative)
+                Text(relativeTimeString)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private var relativeTimeString: String {
+        let interval = timeSnapshot.timeIntervalSince(document.updatedAt)
+        if interval < 60 {
+            return "刚刚"
+        } else if interval < 3600 {
+            return "\(Int(interval / 60))分钟前"
+        } else if interval < 86400 {
+            return "\(Int(interval / 3600))小时前"
+        } else {
+            return "\(Int(interval / 86400))天前"
+        }
     }
 }
 
