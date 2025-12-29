@@ -147,6 +147,61 @@ final class KnowledgeBaseViewModel {
         }
     }
 
+    func updateDocument(_ document: KBDocument) async {
+        isProcessing = true
+        defer { isProcessing = false }
+
+        // 重新分块处理
+        let chunkTexts = chunkingService.chunkText(
+            document.content,
+            delimiter: config.chunkDelimiter,
+            chunkSize: config.chunkSize
+        )
+
+        LogTool.shared.info("Re-chunked document into \(chunkTexts.count) chunks")
+
+        // 为每个分块生成嵌入向量
+        var chunks: [KBChunk] = []
+        for (index, chunkText) in chunkTexts.enumerated() {
+            do {
+                let embedding = try await embeddingService.generateEmbedding(for: chunkText)
+                let chunk = KBChunk(
+                    id: UUID().uuidString,
+                    documentId: document.id,
+                    chunkIndex: index,
+                    content: chunkText,
+                    embedding: embedding,
+                    createdAt: Date()
+                )
+                chunks.append(chunk)
+            } catch {
+                LogTool.shared.error("Failed to generate embedding for chunk \(index): \(error)")
+                let chunk = KBChunk(
+                    id: UUID().uuidString,
+                    documentId: document.id,
+                    chunkIndex: index,
+                    content: chunkText,
+                    embedding: nil,
+                    createdAt: Date()
+                )
+                chunks.append(chunk)
+            }
+        }
+
+        // 更新文档（包含新的分块）
+        var updatedDocument = document
+        updatedDocument.chunks = chunks
+        updatedDocument.updatedAt = Date()
+
+        do {
+            try await store.saveDocument(updatedDocument)
+            await loadDocuments()
+            LogTool.shared.info("Document updated successfully: \(document.title)")
+        } catch {
+            LogTool.shared.error("Failed to update document: \(error)")
+        }
+    }
+
     func searchChunks(query: String) async -> [KBSearchResult] {
         guard !query.isEmpty else { return [] }
 

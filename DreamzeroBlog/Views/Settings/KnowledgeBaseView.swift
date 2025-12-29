@@ -13,6 +13,7 @@ struct KnowledgeBaseView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showAddDocument = false
     @State private var showChunkBrowser = false
+    @State private var editingDocument: KBDocument?
 
     // 使用依赖注入容器获取服务
     private var knowledgeBaseStore: KnowledgeBaseStoreType {
@@ -70,6 +71,18 @@ struct KnowledgeBaseView: View {
                     ChunkBrowserView(viewModel: ChunkBrowserViewModel(knowledgeBaseVM: viewModel))
                 }
             }
+            .sheet(item: $editingDocument) { document in
+                if let viewModel = viewModel {
+                    DocumentEditView(
+                        document: document,
+                        viewModel: viewModel,
+                        isPresented: Binding(
+                            get: { editingDocument != nil },
+                            set: { if !$0 { editingDocument = nil } }
+                        )
+                    )
+                }
+            }
             .onAppear {
                 initializeViewModel()
             }
@@ -87,8 +100,12 @@ struct KnowledgeBaseView: View {
         } else {
             List {
                 ForEach(viewModel.documents) { document in
-                    DocumentRowView(document: document)
-                        .contentShape(Rectangle())
+                    Button {
+                        editingDocument = document
+                    } label: {
+                        DocumentRowView(document: document)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .onDelete(perform: deleteDocuments)
             }
@@ -149,6 +166,10 @@ struct DocumentRowView: View {
                 Text(relativeTimeString)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
         .padding(.vertical, 4)
@@ -164,6 +185,78 @@ struct DocumentRowView: View {
             return "\(Int(interval / 3600))小时前"
         } else {
             return "\(Int(interval / 86400))天前"
+        }
+    }
+}
+
+/// 文档编辑视图
+struct DocumentEditView: View {
+    let document: KBDocument
+    let viewModel: KnowledgeBaseViewModel
+    @Binding var isPresented: Bool
+
+    @State private var title: String
+    @State private var content: String
+    @State private var isSaving = false
+
+    init(document: KBDocument, viewModel: KnowledgeBaseViewModel, isPresented: Binding<Bool>) {
+        self.document = document
+        self.viewModel = viewModel
+        self._isPresented = isPresented
+        self._title = State(initialValue: document.title)
+        self._content = State(initialValue: document.content)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("标题", text: $title)
+                        .textFieldStyle(.plain)
+
+                    TextEditor(text: $content)
+                        .frame(minHeight: 200)
+                } header: {
+                    Text("文档信息")
+                } footer: {
+                    Text("编辑后将重新生成分块和向量嵌入")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("编辑文档")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") {
+                        isPresented = false
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("保存") {
+                        saveDocument()
+                    }
+                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                             content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                             isSaving)
+                }
+            }
+        }
+    }
+
+    private func saveDocument() {
+        isSaving = true
+
+        var updatedDocument = document
+        updatedDocument.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        updatedDocument.content = content.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        Task {
+            await viewModel.updateDocument(updatedDocument)
+            await MainActor.run {
+                isSaving = false
+                isPresented = false
+            }
         }
     }
 }

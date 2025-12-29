@@ -54,6 +54,10 @@ struct ChunkBrowserView: View {
                     Section {
                         ForEach(viewModel.searchResults) { result in
                             SearchResultRowView(result: result)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedChunk = result.chunk
+                                }
                         }
                     } header: {
                         Text("搜索结果 (\(viewModel.searchResults.count))")
@@ -66,6 +70,9 @@ struct ChunkBrowserView: View {
                         ForEach(viewModel.chunks) { chunk in
                             ChunkRowView(chunk: chunk)
                                 .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedChunk = chunk
+                                }
                         }
                     } header: {
                         Text("所有分块 (\(viewModel.chunks.count))")
@@ -90,6 +97,9 @@ struct ChunkBrowserView: View {
                         dismiss()
                     }
                 }
+            }
+            .sheet(item: $selectedChunk) { chunk in
+                ChunkPreviewSheet(chunk: chunk)
             }
             .onAppear {
                 Task {
@@ -160,6 +170,83 @@ struct ChunkRowView: View {
                 .lineLimit(3)
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// 分块预览弹窗
+struct ChunkPreviewSheet: View {
+    let chunk: KBChunk
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    // 分块信息
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("分块 #\(chunk.chunkIndex)")
+                            .font(.headline)
+
+                        HStack(spacing: 12) {
+                            // 嵌入状态
+                            if chunk.embedding != nil {
+                                Label("已嵌入向量", systemImage: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            } else {
+                                Label("未嵌入向量", systemImage: "xmark.circle")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+
+                            // 向量维度
+                            if let embedding = chunk.embedding {
+                                Text("维度: \(embedding.count)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        // 创建时间
+                        Text(formatDate(chunk.createdAt))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 8)
+
+                    Divider()
+
+                    // 分块内容
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("内容")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Text(chunk.content)
+                            .font(.body)
+                            .lineSpacing(6)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("分块详情")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("关闭") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        formatter.locale = Locale(identifier: "zh_CN")
+        return formatter.string(from: date)
     }
 }
 
