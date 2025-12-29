@@ -14,7 +14,9 @@ struct DreamzeroBlogApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             ChatSessionModel.self,
-            ChatMessageModel.self
+            ChatMessageModel.self,
+            KBDocumentModel.self,
+            KBChunkModel.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

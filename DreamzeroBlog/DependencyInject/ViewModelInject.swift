@@ -28,6 +28,14 @@ extension Container {
 
     // 聊天相关 ViewModel
     var chatViewModel: Factory<ChatViewModel> {
-        self { @MainActor in ChatViewModel(repository: self.chatRepository()) }
+        self { @MainActor in
+            ChatViewModel(
+                repository: self.chatRepository(),
+                ragConfig: .shared,
+                knowledgeBaseStore: self.knowledgeBaseStore(),
+                embeddingService: self.embeddingService(),
+                webSearchService: self.webSearchService()
+            )
+        }
     }
 }

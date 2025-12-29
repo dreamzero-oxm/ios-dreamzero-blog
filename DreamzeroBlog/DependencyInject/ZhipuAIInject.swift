@@ -50,9 +50,6 @@ extension Container {
                 return apiKey
             }
 
-            // 仅供腾讯菁英班测试,后续将不可用
-            return "bdd85b6c47e14f6997ffefd4d92d4f34.nhPfPaeuFmSpQQEQ"
-            
             // 默认返回空字符串，需要用户配置
             LogTool.shared.warning("⚠️ 智谱AI API Key未配置，请在设置中配置")
             return ""
