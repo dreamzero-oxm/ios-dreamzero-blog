@@ -75,3 +75,60 @@ public struct ChatSession: Identifiable, Sendable {
         self.updatedAt = updatedAt
     }
 }
+
+// MARK: - SwiftData Model 转换
+
+extension ChatSessionModel {
+    /// 将 SwiftData 模型转换为领域模型
+    func toDomainModel() -> ChatSession {
+        return ChatSession(
+            id: id,
+            title: title,
+            messages: messages.map { $0.toDomainModel() },
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+extension ChatMessageModel {
+    /// 将 SwiftData 模型转换为领域模型
+    func toDomainModel() -> ChatMessage {
+        return ChatMessage(
+            id: id,
+            role: role,
+            content: content,
+            timestamp: timestamp,
+            isStreaming: isStreaming
+        )
+    }
+}
+
+extension ChatSession {
+    /// 将领域模型转换为 SwiftData 持久化模型
+    func toPersistenceModel() -> ChatSessionModel {
+        let sessionModel = ChatSessionModel(
+            id: id,
+            title: title,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+        sessionModel.messages = messages.map { $0.toPersistenceModel(session: sessionModel) }
+        return sessionModel
+    }
+}
+
+extension ChatMessage {
+    /// 将领域模型转换为 SwiftData 持久化模型
+    func toPersistenceModel(session: ChatSessionModel) -> ChatMessageModel {
+        let msgModel = ChatMessageModel(
+            id: id,
+            role: role,
+            content: content,
+            timestamp: timestamp,
+            isStreaming: isStreaming
+        )
+        msgModel.session = session
+        return msgModel
+    }
+}

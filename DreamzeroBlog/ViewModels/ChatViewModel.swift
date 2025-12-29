@@ -37,15 +37,92 @@ final class ChatViewModel {
 
     // 依赖
     private let repository: ChatRepositoryType
+    private let sessionStore: ChatSessionStoreType?
+
+    // 标题生成标志
+    private var hasGeneratedTitle: Bool = false
 
     // 构造器注入
-    init(repository: ChatRepositoryType) {
+    init(repository: ChatRepositoryType, sessionStore: ChatSessionStoreType? = nil) {
         self.repository = repository
+        self.sessionStore = sessionStore
     }
 
     // 便捷构造：从容器解析
     convenience init(container: Container = .shared) {
         self.init(repository: container.chatRepository())
+    }
+
+    // MARK: - 会话管理
+
+    /// 创建新会话（如果当前会话有消息则先保存）
+    func createNewSession() async {
+        // 如果当前会话有消息，先保存
+        if !messages.isEmpty {
+            await saveCurrentSession()
+        }
+        // 创建新会话
+        currentSession = ChatSession(title: "新对话")
+        messages.removeAll()
+        hasGeneratedTitle = false
+        state = .idle
+        inputText = ""
+    }
+
+    /// 加载现有会话（如果当前会话有消息则先保存）
+    func loadSession(_ session: ChatSession) async {
+        // 如果当前会话有消息且不是要加载的会话，先保存
+        if !messages.isEmpty && currentSession.id != session.id {
+            await saveCurrentSession()
+        }
+        state = .loading
+        currentSession = session
+        messages = session.messages
+        hasGeneratedTitle = !session.title.isEmpty && session.title != "新对话"
+        state = .loaded
+    }
+
+    /// 删除会话
+    func deleteSession(_ session: ChatSession) async {
+        guard let sessionStore = sessionStore else { return }
+        do {
+            try await sessionStore.deleteSession(session)
+            // 如果删除的是当前会话，创建新会话
+            if session.id == currentSession.id {
+                messages.removeAll()
+                currentSession = ChatSession(title: "新对话")
+                hasGeneratedTitle = false
+                state = .idle
+                inputText = ""
+            }
+        } catch {
+            LogTool.shared.error("删除会话失败: \(error)")
+        }
+    }
+
+    /// 生成会话标题
+    private func generateTitle(from text: String) {
+        let title = String(text.prefix(20))
+        currentSession.title = title.isEmpty ? "新对话" : (text.count > 20 ? title + "..." : title)
+        hasGeneratedTitle = true
+    }
+
+    /// 保存当前会话
+    private func saveCurrentSession() async {
+        guard let sessionStore = sessionStore else { return }
+        // 只有当会话有消息时才保存
+        guard !messages.isEmpty else { return }
+
+        // 使用最后一条消息的时间作为 updatedAt
+        if let lastMessage = messages.last {
+            currentSession.updatedAt = lastMessage.timestamp
+        }
+
+        do {
+            try await sessionStore.saveSession(currentSession)
+        } catch {
+            LogTool.shared.error("保存会话失败: \(error)")
+        }
     }
 
     // MARK: - 发送消息
@@ -61,6 +138,11 @@ final class ChatViewModel {
         messages.append(userMessage)
         currentSession.messages.append(userMessage)
 
+        // 生成标题（如果还没有）
+        if !hasGeneratedTitle {
+            generateTitle(from: text)
+        }
+
         // 清空输入框
         inputText = ""
 
@@ -75,6 +157,8 @@ final class ChatViewModel {
 
         Task {
             await streamResponse(userMessage: userMessage)
+            // 流式传输完成后保存会话
+            await saveCurrentSession()
         }
     }
 
@@ -153,6 +237,7 @@ final class ChatViewModel {
     func clearChat() {
         messages.removeAll()
         currentSession = ChatSession()
+        hasGeneratedTitle = false
         state = .idle
         inputText = ""
     }
