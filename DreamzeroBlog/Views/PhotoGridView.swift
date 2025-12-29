@@ -11,7 +11,7 @@ import Factory
 struct PhotoGridView: View {
     // 使用 Factory 容器获取 @Observable 的 ViewModel
     @State private var vm: PhotoListViewModel = Container.shared.photoListViewModel()
-    
+    @State private var selectedPhoto: Photo?
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -56,21 +56,29 @@ struct PhotoGridView: View {
             .navigationTitle("日常照片")
             .navigationBarTitleDisplayMode(.inline)
         }
+        .sheet(item: $selectedPhoto) { photo in
+            PhotoDetailView(photo: photo) {
+                selectedPhoto = nil
+            }
+        }
     }
     
     @ViewBuilder
     private func cell(photo: Photo) -> some View {
-        // 用状态保存“当前已知”的纵横比：初始 1:1，加载成功后更新
+        // 用状态保存"当前已知"的纵横比：初始 1:1，加载成功后更新
         @State var ratio: CGFloat = 1
 
         ImageLoader(
             url: "https://www.dreamzero.cn" + photo.imageURL,
             onAspectRatio: { ratio = $0 }
         )
-            
+
         // 关键：在测量阶段也有稳定高度 = colWidth * ratio
         .aspectRatio(ratio, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onTapGesture {
+            selectedPhoto = photo
+        }
     }
 
 }
