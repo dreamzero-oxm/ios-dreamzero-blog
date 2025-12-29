@@ -10,9 +10,10 @@ import SwiftUI
 struct RAGSettingsView: View {
     @State private var viewModel: RAGSettingsViewModel
     @FocusState private var focusedField: Field?
+    @State private var showBaiduAuth = false
 
     enum Field {
-        case delimiter, prompt
+        case delimiter, prompt, baiduAuth
     }
 
     init() {
@@ -27,10 +28,53 @@ struct RAGSettingsView: View {
                     .onChange(of: viewModel.isEnabled) { _, _ in
                         viewModel.saveSettings()
                     }
+
+                Toggle("联网搜索", isOn: $viewModel.webSearchEnabled)
+                    .onChange(of: viewModel.webSearchEnabled) { _, _ in
+                        viewModel.saveSettings()
+                    }
             } header: {
                 Text("基本设置")
             } footer: {
-                Text("启用后，聊天时会自动检索知识库并注入上下文")
+                Text("启用知识库搜索后，聊天时会自动检索知识库并注入上下文。启用联网搜索需要配置百度千帆 AppBuilder API Key。")
+            }
+
+            // 百度搜索配置
+            if viewModel.webSearchEnabled {
+                Section {
+                    HStack(spacing: 8) {
+                        if showBaiduAuth {
+                            TextField("AppBuilder API Key", text: $viewModel.baiduSearchAuthorization)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .focused($focusedField, equals: .baiduAuth)
+                                .onChange(of: viewModel.baiduSearchAuthorization) { _, _ in
+                                    viewModel.saveSettings()
+                                }
+                        } else {
+                            Text(maskedAuthorization)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    showBaiduAuth = true
+                                    focusedField = .baiduAuth
+                                }
+                        }
+
+                        Spacer(minLength: 0)
+
+                        Button(action: { showBaiduAuth.toggle() }) {
+                            Image(systemName: showBaiduAuth ? "eye.slash.fill" : "eye.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("百度搜索配置")
+                } footer: {
+                    Text("请输入百度千帆 AppBuilder API Key（注意：这不是千帆平台的聊天 API Key，而是独立的搜索 API Key）")
+                }
             }
 
             // 搜索配置
@@ -90,7 +134,7 @@ struct RAGSettingsView: View {
             } header: {
                 Text("提示词模板")
             } footer: {
-                Text("可用变量: {context} - 检索到的内容, {query} - 用户问题")
+                Text("可用变量: {context} - 知识库内容, {web_context} - 联网搜索内容, {query} - 用户问题")
             }
 
             // 操作
@@ -103,6 +147,23 @@ struct RAGSettingsView: View {
         }
         .navigationTitle("RAG 设置")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: - Computed Properties
+
+    /// Authorization 掩码显示
+    private var maskedAuthorization: String {
+        let auth = viewModel.baiduSearchAuthorization
+        guard !auth.isEmpty else { return "未配置，点击输入" }
+
+        if auth.count <= 8 {
+            return String(repeating: "*", count: auth.count)
+        }
+
+        let prefix = String(auth.prefix(4))
+        let suffix = String(auth.suffix(4))
+        let masked = String(repeating: "*", count: min(8, auth.count - 8))
+        return "\(prefix)\(masked)\(suffix)"
     }
 }
 

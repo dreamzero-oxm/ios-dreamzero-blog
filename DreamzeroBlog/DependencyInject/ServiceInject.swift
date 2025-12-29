@@ -24,6 +24,11 @@ extension Container {
         self { VectorSearchService() }
     }
 
+    /// 联网搜索服务
+    var webSearchService: Factory<WebSearchServiceType> {
+        self { WebSearchService() }
+    }
+
     /// 知识库存储 - 需要在运行时提供 ModelContext
     var knowledgeBaseStore: Factory<KnowledgeBaseStoreType> {
         self { @MainActor in

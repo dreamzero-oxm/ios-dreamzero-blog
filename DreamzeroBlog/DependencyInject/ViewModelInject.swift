@@ -33,7 +33,8 @@ extension Container {
                 repository: self.chatRepository(),
                 ragConfig: .shared,
                 knowledgeBaseStore: self.knowledgeBaseStore(),
-                embeddingService: self.embeddingService()
+                embeddingService: self.embeddingService(),
+                webSearchService: self.webSearchService()
             )
         }
     }

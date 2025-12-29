@@ -77,14 +77,42 @@ final class RAGConfigurationStore {
         }
     }
 
+    /// 是否启用联网搜索
+    var webSearchEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: Keys.webSearchEnabled) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Keys.webSearchEnabled)
+            LogTool.shared.info("Web search enabled: \(newValue)")
+        }
+    }
+
+    /// 百度千帆搜索 Authorization（存储在 Keychain）
+    var baiduSearchAuthorization: String {
+        get {
+            // 优先从 Keychain 读取
+            if let auth = KeychainHelper.read(key: Keys.baiduSearchAuth), !auth.isEmpty {
+                return auth
+            }
+            return ""
+        }
+        set {
+            // 保存到 Keychain
+            _ = KeychainHelper.save(key: Keys.baiduSearchAuth, value: newValue)
+            LogTool.shared.info("Baidu search authorization updated")
+        }
+    }
+
     // MARK: - Default Values
 
-    /// 默认 Prompt 模板
+    /// 默认 Prompt 模板（支持联网搜索）
     let defaultPromptTemplate = """
-    基于以下知识库内容回答问题。如果知识库中没有相关信息，请忽略知识库的内容。
+    基于以下信息回答问题。
 
-    知识库内容：
+    【知识库内容】
     {context}
+
+    【联网搜索内容】
+    {web_context}
 
     用户问题：
     {query}
@@ -110,6 +138,7 @@ final class RAGConfigurationStore {
         chunkSize = 500
         useCustomPrompt = false
         customPromptTemplate = defaultPromptTemplate
+        webSearchEnabled = false
         LogTool.shared.info("RAG settings reset to defaults")
     }
 
@@ -119,10 +148,11 @@ final class RAGConfigurationStore {
     }
 
     /// 构建带上下文的 Prompt
-    func buildPrompt(context: String, query: String) -> String {
+    func buildPrompt(context: String, webContext: String, query: String) -> String {
         let template = getCurrentPromptTemplate()
         return template
             .replacingOccurrences(of: "{context}", with: context)
+            .replacingOccurrences(of: "{web_context}", with: webContext)
             .replacingOccurrences(of: "{query}", with: query)
     }
 
@@ -135,5 +165,7 @@ final class RAGConfigurationStore {
         static let chunkSize = "RAG_CHUNK_SIZE"
         static let useCustomPrompt = "RAG_USE_CUSTOM_PROMPT"
         static let customPromptTemplate = "RAG_CUSTOM_PROMPT_TEMPLATE"
+        static let webSearchEnabled = "RAG_WEB_SEARCH_ENABLED"
+        static let baiduSearchAuth = "BAIDU_SEARCH_AUTHORIZATION"
     }
 }

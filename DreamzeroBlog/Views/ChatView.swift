@@ -41,7 +41,8 @@ struct ChatView: View {
             sessionStore: sessionStore,
             ragConfig: .shared,
             knowledgeBaseStore: Container.shared.knowledgeBaseStore(),
-            embeddingService: Container.shared.embeddingService()
+            embeddingService: Container.shared.embeddingService(),
+            webSearchService: Container.shared.webSearchService()
         )
     }
 
@@ -73,7 +74,8 @@ struct ChatView: View {
             sessionStore: sessionStore,
             ragConfig: .shared,
             knowledgeBaseStore: Container.shared.knowledgeBaseStore(),
-            embeddingService: Container.shared.embeddingService()
+            embeddingService: Container.shared.embeddingService(),
+            webSearchService: Container.shared.webSearchService()
         )
         vm.messages = baseViewModel.messages
         vm.currentSession = baseViewModel.currentSession

@@ -13,6 +13,8 @@ import Observation
 @Observable
 final class RAGSettingsViewModel {
     var isEnabled: Bool
+    var webSearchEnabled: Bool
+    var baiduSearchAuthorization: String
     var topK: Int
     var chunkDelimiter: String
     var chunkSize: Int
@@ -24,6 +26,8 @@ final class RAGSettingsViewModel {
     init(store: RAGConfigurationStore = .shared) {
         self.store = store
         self.isEnabled = store.isEnabled
+        self.webSearchEnabled = store.webSearchEnabled
+        self.baiduSearchAuthorization = store.baiduSearchAuthorization
         self.topK = store.topK
         self.chunkDelimiter = store.chunkDelimiter
         self.chunkSize = store.chunkSize
@@ -33,6 +37,8 @@ final class RAGSettingsViewModel {
 
     func saveSettings() {
         store.isEnabled = isEnabled
+        store.webSearchEnabled = webSearchEnabled
+        store.baiduSearchAuthorization = baiduSearchAuthorization
         store.topK = topK
         store.chunkDelimiter = chunkDelimiter
         store.chunkSize = chunkSize
@@ -49,6 +55,8 @@ final class RAGSettingsViewModel {
 
     func loadSettings() {
         isEnabled = store.isEnabled
+        webSearchEnabled = store.webSearchEnabled
+        baiduSearchAuthorization = store.baiduSearchAuthorization
         topK = store.topK
         chunkDelimiter = store.chunkDelimiter
         chunkSize = store.chunkSize
