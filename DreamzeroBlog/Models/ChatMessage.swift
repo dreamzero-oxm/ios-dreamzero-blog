@@ -84,7 +84,16 @@ extension ChatSessionModel {
         return ChatSession(
             id: id,
             title: title,
-            messages: messages.map { $0.toDomainModel() },
+            messages: messages
+                .sorted { lhs, rhs in
+                    // 主排序：按时间戳升序（旧消息在前）
+                    if lhs.timestamp != rhs.timestamp {
+                        return lhs.timestamp < rhs.timestamp
+                    }
+                    // 次排序：按 ID 确保稳定性（处理时间戳相同的情况）
+                    return lhs.id < rhs.id
+                }
+                .map { $0.toDomainModel() },
             createdAt: createdAt,
             updatedAt: updatedAt
         )

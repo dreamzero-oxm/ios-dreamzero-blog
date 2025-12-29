@@ -21,13 +21,15 @@ extension Container {
     }
 
     // 注册 ChatRepository（智谱AI）
+    // 不使用 .cached，确保每次都获取最新配置
     var chatRepository: Factory<ChatRepositoryType> {
         self {
-            let apiKey = self.zhipuAPIKey()
-            LogTool.shared.debug("🔧 ChatRepository 注入 API Key: \(apiKey.isEmpty ? "空" : apiKey.prefix(20) + "...")")
+            // 直接从Store读取最新配置
+            let config = APIConfigurationStore.shared.currentConfiguration
+            LogTool.shared.debug("🔧 ChatRepository 注入 API配置: \(config.provider.rawValue), URL: \(config.apiURL)")
             return ChatRepository(
                 client: self.apiClient(),
-                apiKey: apiKey
+                configuration: config
             )
         }
     }
