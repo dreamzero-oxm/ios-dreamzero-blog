@@ -21,6 +21,7 @@ struct ChatView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var showSessionList: Bool = false
+    @State private var showCopyToast: Bool = false
 
     // 使用 Factory 创建的 ViewModel（不带 sessionStore）
     @State private var baseViewModel: ChatViewModel = Container.shared.chatViewModel()
@@ -65,6 +66,11 @@ struct ChatView: View {
                         modelContext: modelContext,
                         baseViewModel: $baseViewModel
                     )
+                }
+                .overlay(alignment: .top) {
+                    if showCopyToast {
+                        CopyToastView()
+                    }
                 }
         }
         .onAppear {
@@ -145,8 +151,13 @@ struct ChatView: View {
 
     private var messageBubbles: some View {
         ForEach(baseViewModel.messages) { message in
-            MessageBubble(message: message)
-                .id(message.id)
+            MessageBubble(message: message) {
+                showCopyToast = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    showCopyToast = false
+                }
+            }
+            .id(message.id)
         }
     }
 
@@ -436,6 +447,7 @@ struct RecentSessionCell: View {
 
 struct MessageBubble: View, Equatable {
     let message: ChatMessage
+    var onCopy: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -482,6 +494,7 @@ struct MessageBubble: View, Equatable {
         .contextMenu {
             Button {
                 copyToClipboard(message.content)
+                onCopy?()
             } label: {
                 Label("复制", systemImage: "doc.on.doc")
             }
@@ -528,6 +541,7 @@ struct MessageBubble: View, Equatable {
         if !message.isStreaming {
             Button(action: {
                 copyToClipboard(message.content)
+                onCopy?()
             }) {
                 HStack(spacing: 4) {
                     Image(systemName: "doc.on.doc")
@@ -579,6 +593,43 @@ struct MessageBubble: View, Equatable {
             return Color(.systemGray4)
         case .system:
             return Color(.systemYellow)
+        }
+    }
+}
+
+// MARK: - Copy Toast View
+
+struct CopyToastView: View {
+    @State private var opacity: Double = 0
+    @State private var offset: CGFloat = -20
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+            Text("已复制")
+                .font(.subheadline)
+                .foregroundColor(.primary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(.systemBackground))
+        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .cornerRadius(20)
+        .padding(.top, 8)
+        .opacity(opacity)
+        .offset(y: offset)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.3)) {
+                opacity = 1
+                offset = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation(.easeIn(duration: 0.3)) {
+                    opacity = 0
+                    offset = -20
+                }
+            }
         }
     }
 }
