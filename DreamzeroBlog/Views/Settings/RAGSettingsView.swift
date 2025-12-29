@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct RAGSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: RAGSettingsViewModel
     @FocusState private var focusedField: Field?
     @State private var showBaiduAuth = false
@@ -147,6 +148,13 @@ struct RAGSettingsView: View {
         }
         .navigationTitle("RAG 设置")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("关闭") {
+                    dismiss()
+                }
+            }
+        }
     }
 
     // MARK: - Computed Properties

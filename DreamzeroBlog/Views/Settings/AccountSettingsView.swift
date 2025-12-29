@@ -10,6 +10,7 @@ import SwiftUI
 /// 账号设置视图
 /// 包含原有的登录界面内容
 struct AccountSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var username = ""
     @State private var password = ""
     @State private var isLoading = false
@@ -139,6 +140,13 @@ struct AccountSettingsView: View {
         }
         .navigationTitle("账号")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("关闭") {
+                    dismiss()
+                }
+            }
+        }
         .sheet(isPresented: $showRegisterSheet) {
             RegisterView()
         }

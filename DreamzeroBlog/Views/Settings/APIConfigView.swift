@@ -9,6 +9,7 @@ import SwiftUI
 
 /// API配置视图
 struct APIConfigView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var formViewModel: APIConfigViewModel
     @State private var showAPIKey = false
     @State private var showAlert = false
@@ -197,6 +198,13 @@ struct APIConfigView: View {
         }
         .navigationTitle("API配置")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("关闭") {
+                    dismiss()
+                }
+            }
+        }
         .alert("提示", isPresented: $showAlert) {
             Button("确定", role: .cancel) { }
         } message: {
