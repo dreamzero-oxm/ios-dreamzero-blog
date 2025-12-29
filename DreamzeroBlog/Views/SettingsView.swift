@@ -28,6 +28,19 @@ struct SettingsView: View {
                     Text("聊天设置")
                 }
 
+                // 知识库
+                Section {
+                    NavigationLink(destination: KnowledgeBaseView()) {
+                        Label("知识库", systemImage: "book.closed")
+                    }
+
+                    NavigationLink(destination: RAGSettingsView()) {
+                        Label("RAG 设置", systemImage: "gearshape.2")
+                    }
+                } header: {
+                    Text("知识库")
+                }
+
                 // 关于
                 Section {
                     HStack {

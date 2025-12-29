@@ -38,14 +38,26 @@ final class ChatViewModel {
     // 依赖
     private let repository: ChatRepositoryType
     private let sessionStore: ChatSessionStoreType?
+    private let ragConfig: RAGConfigurationStore
+    private var knowledgeBaseStore: KnowledgeBaseStoreType?
+    private var embeddingService: EmbeddingServiceType?
 
     // 标题生成标志
     private var hasGeneratedTitle: Bool = false
 
     // 构造器注入
-    init(repository: ChatRepositoryType, sessionStore: ChatSessionStoreType? = nil) {
+    init(
+        repository: ChatRepositoryType,
+        sessionStore: ChatSessionStoreType? = nil,
+        ragConfig: RAGConfigurationStore = .shared,
+        knowledgeBaseStore: KnowledgeBaseStoreType? = nil,
+        embeddingService: EmbeddingServiceType? = nil
+    ) {
         self.repository = repository
         self.sessionStore = sessionStore
+        self.ragConfig = ragConfig
+        self.knowledgeBaseStore = knowledgeBaseStore
+        self.embeddingService = embeddingService
     }
 
     // 便捷构造：从容器解析
@@ -172,13 +184,73 @@ final class ChatViewModel {
 
     // MARK: - 流式接收响应
 
+    /// 使用 RAG 增强查询
+    private func enhanceQueryWithRAG(_ query: String) async -> String {
+        // 检查 RAG 是否启用
+        LogTool.shared.debug("RAG isEnabled: \(ragConfig.isEnabled)")
+        guard ragConfig.isEnabled else { return query }
+
+        // 检查依赖是否可用
+        guard let store = knowledgeBaseStore,
+              let embeddingService = embeddingService else {
+            LogTool.shared.warning("RAG dependencies not configured")
+            return query
+        }
+
+        do {
+            // 生成查询嵌入
+            let queryEmbedding = try await embeddingService.generateEmbedding(for: query)
+
+            // 获取所有分块
+            let allChunks = try await store.fetchAllChunks()
+            guard !allChunks.isEmpty else {
+                LogTool.shared.info("No chunks in knowledge base")
+                return query
+            }
+
+            // 执行向量搜索
+            let results = VectorSearchService().search(
+                queryEmbedding: queryEmbedding,
+                chunks: allChunks,
+                topK: ragConfig.topK
+            )
+
+            guard !results.isEmpty else {
+                LogTool.shared.info("No relevant chunks found")
+                return query
+            }
+
+            // 获取文档标题
+            let documents = try await store.fetchAllDocuments()
+            let documentMap = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0.title) })
+
+            // 构建上下文
+            let context = results.map { result in
+                let title = documentMap[result.chunk.documentId] ?? "未知文档"
+                return "[\(title)] \(result.chunk.content)"
+            }.joined(separator: "\n\n")
+
+            // 应用模板
+            let enhancedPrompt = ragConfig.buildPrompt(context: context, query: query)
+            LogTool.shared.info("RAG enhanced query with \(results.count) chunks")
+            return enhancedPrompt
+
+        } catch {
+            LogTool.shared.error("RAG enhancement failed: \(error)")
+            return query
+        }
+    }
+
     private func streamResponse(userMessage: ChatMessage) async {
         do {
+            // RAG 增强查询
+            let enhancedContent = await enhanceQueryWithRAG(userMessage.content)
+
             // 发送最后5条消息（包含当前用户问题），保持对话上下文
             let recentMessages = Array(messages.suffix(5).dropLast())
             let messageDtos = recentMessages.map { msg in
                 ChatMessageDto(role: ChatRole(rawValue: msg.role.rawValue)!, content: msg.content)
-            } + [ChatMessageDto(role: .user, content: userMessage.content)]
+            } + [ChatMessageDto(role: .user, content: enhancedContent)]
 
             // 获取流式响应
             let stream = try await repository.streamChat(
