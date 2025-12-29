@@ -20,6 +20,17 @@ struct ChatView: View {
     // 使用 Factory 创建的 ViewModel（不带 sessionStore）
     @State private var baseViewModel: ChatViewModel = Container.shared.chatViewModel()
 
+    // 最近会话查询
+    @Query(
+        sort: \ChatSessionModel.updatedAt,
+        order: .reverse
+    ) private var recentSessionModels: [ChatSessionModel]
+
+    // 计算属性：获取最近5条会话
+    private var recentSessions: [ChatSession] {
+        recentSessionModels.prefix(5).map { $0.toDomainModel() }
+    }
+
     // 创建带 sessionStore 的 ViewModel
     private var viewModel: ChatViewModel {
         let sessionStore = ChatSessionStore(modelContext: modelContext)
@@ -99,7 +110,14 @@ struct ChatView: View {
     private var messageList: some View {
         Group {
             if baseViewModel.messages.isEmpty {
-                EmptyStateView()
+                EmptyStateView(
+                    recentSessions: recentSessions,
+                    onSelectSession: { session in
+                        Task {
+                            await baseViewModel.loadSession(session)
+                        }
+                    }
+                )
             } else {
                 LazyVStack(spacing: 16) {
                     messageBubbles
@@ -296,31 +314,108 @@ struct AvatarView: View {
 // MARK: - 空状态视图
 
 struct EmptyStateView: View {
+    let recentSessions: [ChatSession]
+    var onSelectSession: ((ChatSession) -> Void)?
+
+    init(recentSessions: [ChatSession], onSelectSession: ((ChatSession) -> Void)? = nil) {
+        self.recentSessions = recentSessions
+        self.onSelectSession = onSelectSession
+    }
+
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
+        ScrollView {
+            VStack(spacing: 24) {
+                Spacer().frame(height: 40)
 
-            Image(systemName: "message.badge")
-                .font(.system(size: 60))
-                .foregroundColor(.blue.opacity(0.6))
+                // 顶部空状态提示
+                VStack(spacing: 12) {
+                    Image(systemName: "message.badge")
+                        .font(.system(size: 50))
+                        .foregroundColor(.blue.opacity(0.6))
 
-            VStack(spacing: 8) {
-                Text("开始对话")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    Text("开始对话")
+                        .font(.title2)
+                        .fontWeight(.semibold)
 
-                Text("发送消息，AI 助手将随时为您服务")
-                    .font(.body)
-                    .foregroundColor(.secondary)
+                    Text("发送消息，AI 助手将随时为您服务")
+                        .font(.body)
+                        .foregroundColor(.secondary)
 
-                Text("内容由 AI 生成，请仔细甄别")
-                    .font(.caption)
+                    Text("内容由 AI 生成，请仔细甄别")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.bottom, 8)
+
+                // 最近会话列表
+                if !recentSessions.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("最近会话")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 20)
+
+                        VStack(spacing: 8) {
+                            ForEach(recentSessions) { session in
+                                Button(action: {
+                                    onSelectSession?(session)
+                                }) {
+                                    RecentSessionCell(session: session)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+                    .transition(.opacity)
+                }
+
+                Spacer().frame(minHeight: 40)
+            }
+        }
+    }
+}
+
+/// 最近会话单元格（简化版）
+struct RecentSessionCell: View {
+    let session: ChatSession
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "message.circle")
+                .font(.system(size: 24))
+                .foregroundColor(.blue)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
+
+                Text(relativeTimeString)
+                    .font(.caption2)
                     .foregroundColor(.secondary)
             }
 
             Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(12)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var relativeTimeString: String {
+        let interval = Date().timeIntervalSince(session.updatedAt)
+        if interval < 60 {
+            return "刚刚"
+        } else if interval < 3600 {
+            return "\(Int(interval / 60))分钟前"
+        } else if interval < 86400 {
+            return "\(Int(interval / 3600))小时前"
+        } else {
+            return "\(Int(interval / 86400))天前"
+        }
     }
 }
 
