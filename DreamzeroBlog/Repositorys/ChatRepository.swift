@@ -58,6 +58,8 @@ final class ChatRepository: ChatRepositoryType {
         LogTool.shared.debug("🤖 模型: \(actualModel)")
         LogTool.shared.debug("🔑 API Key: \(configuration.apiKey.isEmpty ? "空" : configuration.apiKey.prefix(20) + "...")")
         LogTool.shared.debug("🔐 使用JWT: \(configuration.useJWT)")
+        // 打印消息
+        LogTool.shared.debug("消息: \(messages)")
 
         // 创建Endpoint（包含API配置）
         let endpoint = ChatCompletionEndpoint(

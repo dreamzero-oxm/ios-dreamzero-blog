@@ -38,19 +38,40 @@ final class ChatViewModel {
     // 依赖
     private let repository: ChatRepositoryType
     private let sessionStore: ChatSessionStoreType?
+    private let ragConfig: RAGConfigurationStore
+    private var knowledgeBaseStore: KnowledgeBaseStoreType?
+    private var embeddingService: EmbeddingServiceType?
+    private var webSearchService: WebSearchServiceType?
 
     // 标题生成标志
     private var hasGeneratedTitle: Bool = false
 
     // 构造器注入
-    init(repository: ChatRepositoryType, sessionStore: ChatSessionStoreType? = nil) {
+    init(
+        repository: ChatRepositoryType,
+        sessionStore: ChatSessionStoreType? = nil,
+        ragConfig: RAGConfigurationStore = .shared,
+        knowledgeBaseStore: KnowledgeBaseStoreType? = nil,
+        embeddingService: EmbeddingServiceType? = nil,
+        webSearchService: WebSearchServiceType? = nil
+    ) {
         self.repository = repository
         self.sessionStore = sessionStore
+        self.ragConfig = ragConfig
+        self.knowledgeBaseStore = knowledgeBaseStore
+        self.embeddingService = embeddingService
+        self.webSearchService = webSearchService
     }
 
     // 便捷构造：从容器解析
     convenience init(container: Container = .shared) {
-        self.init(repository: container.chatRepository())
+        self.init(
+            repository: container.chatRepository(),
+            ragConfig: .shared,
+            knowledgeBaseStore: container.knowledgeBaseStore(),
+            embeddingService: container.embeddingService(),
+            webSearchService: container.webSearchService()
+        )
     }
 
     // MARK: - 会话管理
@@ -172,13 +193,110 @@ final class ChatViewModel {
 
     // MARK: - 流式接收响应
 
+    /// 使用 RAG 增强查询
+    private func enhanceQueryWithRAG(_ query: String) async -> String {
+        // 检查 RAG 是否启用
+        LogTool.shared.debug("RAG isEnabled: \(ragConfig.isEnabled)")
+        guard ragConfig.isEnabled else { return query }
+
+        var context = ""
+        var webContext = ""
+
+        // 1. 知识库检索
+        if let store = knowledgeBaseStore, let embeddingService = embeddingService {
+            do {
+                // 生成查询嵌入
+                let queryEmbedding = try await embeddingService.generateEmbedding(for: query)
+
+                // 获取所有分块
+                let allChunks = try await store.fetchAllChunks()
+                guard !allChunks.isEmpty else {
+                    LogTool.shared.info("No chunks in knowledge base")
+                    return query
+                }
+
+                // 执行向量搜索
+                let results = VectorSearchService().search(
+                    queryEmbedding: queryEmbedding,
+                    chunks: allChunks,
+                    topK: ragConfig.topK
+                )
+
+                if !results.isEmpty {
+                    // 获取文档标题
+                    let documents = try await store.fetchAllDocuments()
+                    let documentMap = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0.title) })
+
+                    // 构建上下文
+                    context = results.map { result in
+                        let title = documentMap[result.chunk.documentId] ?? "未知文档"
+                        return "[\(title)] \(result.chunk.content)"
+                    }.joined(separator: "\n\n")
+
+                    LogTool.shared.info("RAG enhanced query with \(results.count) chunks")
+                } else {
+                    LogTool.shared.info("No relevant chunks found")
+                }
+            } catch {
+                LogTool.shared.error("Knowledge base search failed: \(error)")
+            }
+        }
+
+        // 2. 联网搜索
+        if ragConfig.webSearchEnabled, let webService = webSearchService {
+            do {
+                let webResults = try await webService.search(query: query)
+                if !webResults.isEmpty {
+                    webContext = webResults.map { result in
+                        "[\(result.title)](\(result.url))\n\(result.content)"
+                    }.joined(separator: "\n\n")
+                    LogTool.shared.info("Web search found \(webResults.count) results")
+                }else{
+                    LogTool.shared.info("No web search results found")
+                }
+            } catch {
+                LogTool.shared.error("Web search failed: \(error)")
+
+                // 如果是未配置错误，添加警告消息到聊天
+                if let searchError = error as? WebSearchError,
+                   case .notConfigured = searchError {
+                    // 使用确定性 ID，避免重新加载时位置变化
+                    let warningId = "warning-baidu-search-not-configured"
+                    let warningMessage = ChatMessage(
+                        id: warningId,
+                        role: .system,
+                        content: "⚠️ 联网搜索未配置：请在 RAG 设置中配置百度千帆 AppBuilder API Key"
+                    )
+                    messages.append(warningMessage)
+                    currentSession.messages.append(warningMessage)
+                }
+            }
+        }
+
+        // 如果没有任何上下文，返回原始查询
+        if context.isEmpty && webContext.isEmpty {
+            return query
+        }
+
+        // 应用模板（同时支持 context 和 web_context）
+        let enhancedPrompt = ragConfig.buildPrompt(
+            context: context.isEmpty ? "暂无知识库内容" : context,
+            webContext: webContext.isEmpty ? "暂无联网搜索内容" : webContext,
+            query: query
+        )
+        return enhancedPrompt
+    }
+
     private func streamResponse(userMessage: ChatMessage) async {
         do {
+            // RAG 增强查询
+            let enhancedContent = await enhanceQueryWithRAG(userMessage.content)
+
             // 发送最后5条消息（包含当前用户问题），保持对话上下文
             let recentMessages = Array(messages.suffix(5).dropLast())
             let messageDtos = recentMessages.map { msg in
                 ChatMessageDto(role: ChatRole(rawValue: msg.role.rawValue)!, content: msg.content)
-            } + [ChatMessageDto(role: .user, content: userMessage.content)]
+            } + [ChatMessageDto(role: .user, content: enhancedContent)]
 
             // 获取流式响应
             let stream = try await repository.streamChat(

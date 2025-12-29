@@ -10,15 +10,24 @@ import Factory
 import MarkdownUI
 import SwiftData
 
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
+
 struct ChatView: View {
     @FocusState private var isInputFocused: Bool
 
     @Environment(\.modelContext) private var modelContext
     @State private var showSessionList: Bool = false
-    @State private var currentProvider: APIProvider = APIConfigurationStore.shared.currentProvider
+    @State private var showCopyToast: Bool = false
 
     // 使用 Factory 创建的 ViewModel（不带 sessionStore）
     @State private var baseViewModel: ChatViewModel = Container.shared.chatViewModel()
+
+    // 直接观察 shared store，无需本地 @State
+    private var apiConfigStore: APIConfigurationStore { .shared }
 
     // 最近会话查询
     @Query(
@@ -36,7 +45,11 @@ struct ChatView: View {
         let sessionStore = ChatSessionStore(modelContext: modelContext)
         return ChatViewModel(
             repository: Container.shared.chatRepository(),
-            sessionStore: sessionStore
+            sessionStore: sessionStore,
+            ragConfig: .shared,
+            knowledgeBaseStore: Container.shared.knowledgeBaseStore(),
+            embeddingService: Container.shared.embeddingService(),
+            webSearchService: Container.shared.webSearchService()
         )
     }
 
@@ -54,6 +67,11 @@ struct ChatView: View {
                         baseViewModel: $baseViewModel
                     )
                 }
+                .overlay(alignment: .top) {
+                    if showCopyToast {
+                        CopyToastView()
+                    }
+                }
         }
         .onAppear {
             // 初始化时同步 baseViewModel 的状态
@@ -65,7 +83,11 @@ struct ChatView: View {
         let sessionStore = ChatSessionStore(modelContext: modelContext)
         let vm = ChatViewModel(
             repository: Container.shared.chatRepository(),
-            sessionStore: sessionStore
+            sessionStore: sessionStore,
+            ragConfig: .shared,
+            knowledgeBaseStore: Container.shared.knowledgeBaseStore(),
+            embeddingService: Container.shared.embeddingService(),
+            webSearchService: Container.shared.webSearchService()
         )
         vm.messages = baseViewModel.messages
         vm.currentSession = baseViewModel.currentSession
@@ -129,8 +151,13 @@ struct ChatView: View {
 
     private var messageBubbles: some View {
         ForEach(baseViewModel.messages) { message in
-            MessageBubble(message: message)
-                .id(message.id)
+            MessageBubble(message: message) {
+                showCopyToast = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                    showCopyToast = false
+                }
+            }
+            .id(message.id)
         }
     }
 
@@ -170,7 +197,7 @@ struct ChatView: View {
                         }) {
                             HStack {
                                 Text(provider.rawValue)
-                                if currentProvider == provider {
+                                if apiConfigStore.currentProvider == provider {
                                     Image(systemName: "checkmark")
                                 }
                             }
@@ -186,12 +213,12 @@ struct ChatView: View {
                     Image(systemName: "ellipsis.circle")
                 }
 
-                // 清空按钮
-                Button(action: baseViewModel.clearChat) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.red)
-                }
-                .disabled(baseViewModel.messages.isEmpty || baseViewModel.isStreaming)
+//                // 清空按钮
+//                Button(action: baseViewModel.clearChat) {
+//                    Image(systemName: "trash")
+//                        .foregroundColor(.red)
+//                }
+//                .disabled(baseViewModel.messages.isEmpty || baseViewModel.isStreaming)
             }
         }
     }
@@ -254,9 +281,6 @@ struct ChatView: View {
     private func switchAPIProvider(_ provider: APIProvider) {
         // 切换API配置
         APIConfigurationStore.shared.currentProvider = provider
-
-        // 更新本地状态
-        currentProvider = provider
 
         // 显示提示
         LogTool.shared.debug("✅ 已切换到 \(provider.rawValue)")
@@ -423,6 +447,7 @@ struct RecentSessionCell: View {
 
 struct MessageBubble: View, Equatable {
     let message: ChatMessage
+    var onCopy: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -445,6 +470,7 @@ struct MessageBubble: View, Equatable {
             roleLabelView
             messageContentView
             streamingIndicator
+            copyButton
         }
         .frame(maxWidth: 300, alignment: message.role == .user ? .trailing : .leading)
     }
@@ -458,10 +484,20 @@ struct MessageBubble: View, Equatable {
 
     @ViewBuilder
     private var messageContentView: some View {
-        if message.role == .user {
-            userMessageView
-        } else {
-            assistantMessageView
+        Group {
+            if message.role == .user {
+                userMessageView
+            } else {
+                assistantMessageView
+            }
+        }
+        .contextMenu {
+            Button {
+                copyToClipboard(message.content)
+                onCopy?()
+            } label: {
+                Label("复制", systemImage: "doc.on.doc")
+            }
         }
     }
 
@@ -497,6 +533,29 @@ struct MessageBubble: View, Equatable {
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var copyButton: some View {
+        if !message.isStreaming {
+            Button(action: {
+                copyToClipboard(message.content)
+                onCopy?()
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.caption2)
+                    Text("复制")
+                        .font(.caption2)
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(.systemGray6).opacity(0.8))
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -536,6 +595,54 @@ struct MessageBubble: View, Equatable {
             return Color(.systemYellow)
         }
     }
+}
+
+// MARK: - Copy Toast View
+
+struct CopyToastView: View {
+    @State private var opacity: Double = 0
+    @State private var offset: CGFloat = -20
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+            Text("已复制")
+                .font(.subheadline)
+                .foregroundColor(.primary)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color(.systemBackground))
+        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+        .cornerRadius(20)
+        .padding(.top, 8)
+        .opacity(opacity)
+        .offset(y: offset)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.3)) {
+                opacity = 1
+                offset = 0
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                withAnimation(.easeIn(duration: 0.3)) {
+                    opacity = 0
+                    offset = -20
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Clipboard Utility
+
+func copyToClipboard(_ text: String) {
+    #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    #elseif os(iOS)
+        UIPasteboard.general.string = text
+    #endif
 }
 
 // MARK: - 预览
