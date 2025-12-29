@@ -31,6 +31,9 @@ final class ChatViewModel {
     private var lastUpdateTime: Date = .distantPast
     private let updateInterval: TimeInterval = 0.08  // 80ms 更新一次（约12fps）
 
+    // 存储当前流式传输的 Task，用于取消
+    private var streamingTask: Task<Void, Never>?
+
     // 配置
     private let model: String = "glm-4.7"
     private let temperature: Double? = 0.7
@@ -184,11 +187,37 @@ final class ChatViewModel {
         isStreaming = true
         state = .loading
 
-        Task {
+        streamingTask = Task {
             await streamResponse(userMessage: userMessage)
             // 流式传输完成后保存会话
             await saveCurrentSession()
+            streamingTask = nil
         }
+    }
+
+    /// 停止当前流式传输
+    func stopStreaming() {
+        guard let task = streamingTask, !task.isCancelled else { return }
+
+        // 取消任务
+        task.cancel()
+
+        // 标记最后一条消息为已打断
+        if let lastIndex = messages.indices.last,
+           messages[lastIndex].role == .assistant {
+            messages[lastIndex].isStreaming = false
+            // 添加打断标记
+            if !messages[lastIndex].content.isEmpty {
+                messages[lastIndex].content += "\n\n*（回答已打断）*"
+            }
+            currentSession.messages[lastIndex].isStreaming = false
+            currentSession.messages[lastIndex].content = messages[lastIndex].content
+        }
+
+        // 重置状态
+        isStreaming = false
+        state = .loaded
+        streamingTask = nil
     }
 
     // MARK: - 流式接收响应

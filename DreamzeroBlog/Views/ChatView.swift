@@ -74,8 +74,22 @@ struct ChatView: View {
                 }
         }
         .onAppear {
-            // 初始化时同步 baseViewModel 的状态
+            // 如果显示正在流式传输但没有实际的任务，重置状态
+            if baseViewModel.isStreaming {
+                // 检查是否有正在流式的消息
+                let hasStreamingMessage = baseViewModel.messages.contains { $0.isStreaming }
+                if !hasStreamingMessage {
+                    // 没有正在流式的消息但状态显示为流式中，重置状态
+                    baseViewModel.stopStreaming()
+                }
+            }
             syncViewModel()
+        }
+        .onDisappear {
+            // 页面消失时取消正在进行的流式传输
+            if baseViewModel.isStreaming {
+                baseViewModel.stopStreaming()
+            }
         }
     }
 
@@ -89,11 +103,18 @@ struct ChatView: View {
             embeddingService: Container.shared.embeddingService(),
             webSearchService: Container.shared.webSearchService()
         )
+
+        // 检查是否有正在流式的消息
+        let hasStreamingMessage = baseViewModel.messages.contains { $0.isStreaming }
+
         vm.messages = baseViewModel.messages
         vm.currentSession = baseViewModel.currentSession
         vm.state = baseViewModel.state
-        vm.isStreaming = baseViewModel.isStreaming
+
+        // 如果没有实际正在流式的消息，重置状态
+        vm.isStreaming = hasStreamingMessage ? baseViewModel.isStreaming : false
         vm.inputText = baseViewModel.inputText
+
         baseViewModel = vm
     }
 
@@ -236,21 +257,14 @@ struct ChatView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(20)
                     .lineLimit(1...6)
+                    .disabled(baseViewModel.isStreaming)
 
-                // 发送按钮
-                Button(action: {
-                    baseViewModel.sendMessage()
-                    isInputFocused = false
-                }) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(canSendMessage ? .blue : .gray)
-                }
-                .disabled(!canSendMessage || baseViewModel.isStreaming)
+                // 使用新的条件按钮
+                inputActionButton
             }
             .padding([.horizontal, .top])
             .padding(.bottom, 4)
-            
+
             Text("内容由AI生成，请仔细甄别")
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -263,6 +277,31 @@ struct ChatView: View {
 
     private var canSendMessage: Bool {
         !baseViewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    @ViewBuilder
+    private var inputActionButton: some View {
+        if baseViewModel.isStreaming {
+            // 停止按钮
+            Button(action: {
+                baseViewModel.stopStreaming()
+            }) {
+                Image(systemName: "stop.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.red)
+            }
+        } else {
+            // 发送按钮
+            Button(action: {
+                baseViewModel.sendMessage()
+                isInputFocused = false
+            }) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(canSendMessage ? .blue : .gray)
+            }
+            .disabled(!canSendMessage)
+        }
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
