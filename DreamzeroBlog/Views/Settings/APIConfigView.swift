@@ -73,7 +73,7 @@ struct APIConfigView: View {
                             .autocorrectionDisabled()
                             .focused($focusedField, equals: .apiKey)
                     } else {
-                        Text(APIConfigViewModel.maskAPIKey(formViewModel.apiKey).isEmpty ? "未配置, 点击右侧眼睛图标进行配置" : APIConfigViewModel.maskAPIKey(formViewModel.apiKey))
+                        Text(APIConfigViewModel.maskAPIKey(formViewModel.apiKey).isEmpty ? "未配置, 点击该处进行配置" : APIConfigViewModel.maskAPIKey(formViewModel.apiKey))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .contentShape(Rectangle())
