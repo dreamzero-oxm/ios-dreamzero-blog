@@ -10,6 +10,12 @@ import Factory
 import MarkdownUI
 import SwiftData
 
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
+
 struct ChatView: View {
     @FocusState private var isInputFocused: Bool
 
@@ -452,6 +458,7 @@ struct MessageBubble: View, Equatable {
             roleLabelView
             messageContentView
             streamingIndicator
+            copyButton
         }
         .frame(maxWidth: 300, alignment: message.role == .user ? .trailing : .leading)
     }
@@ -465,10 +472,19 @@ struct MessageBubble: View, Equatable {
 
     @ViewBuilder
     private var messageContentView: some View {
-        if message.role == .user {
-            userMessageView
-        } else {
-            assistantMessageView
+        Group {
+            if message.role == .user {
+                userMessageView
+            } else {
+                assistantMessageView
+            }
+        }
+        .contextMenu {
+            Button {
+                copyToClipboard(message.content)
+            } label: {
+                Label("复制", systemImage: "doc.on.doc")
+            }
         }
     }
 
@@ -504,6 +520,28 @@ struct MessageBubble: View, Equatable {
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var copyButton: some View {
+        if !message.isStreaming {
+            Button(action: {
+                copyToClipboard(message.content)
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.caption2)
+                    Text("复制")
+                        .font(.caption2)
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(.systemGray6).opacity(0.8))
+                .cornerRadius(8)
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -543,6 +581,17 @@ struct MessageBubble: View, Equatable {
             return Color(.systemYellow)
         }
     }
+}
+
+// MARK: - Clipboard Utility
+
+func copyToClipboard(_ text: String) {
+    #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    #elseif os(iOS)
+        UIPasteboard.general.string = text
+    #endif
 }
 
 // MARK: - 预览
