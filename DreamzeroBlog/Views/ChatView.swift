@@ -15,10 +15,12 @@ struct ChatView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var showSessionList: Bool = false
-    @State private var currentProvider: APIProvider = APIConfigurationStore.shared.currentProvider
 
     // 使用 Factory 创建的 ViewModel（不带 sessionStore）
     @State private var baseViewModel: ChatViewModel = Container.shared.chatViewModel()
+
+    // 直接观察 shared store，无需本地 @State
+    private var apiConfigStore: APIConfigurationStore { .shared }
 
     // 最近会话查询
     @Query(
@@ -176,7 +178,7 @@ struct ChatView: View {
                         }) {
                             HStack {
                                 Text(provider.rawValue)
-                                if currentProvider == provider {
+                                if apiConfigStore.currentProvider == provider {
                                     Image(systemName: "checkmark")
                                 }
                             }
@@ -192,12 +194,12 @@ struct ChatView: View {
                     Image(systemName: "ellipsis.circle")
                 }
 
-                // 清空按钮
-                Button(action: baseViewModel.clearChat) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.red)
-                }
-                .disabled(baseViewModel.messages.isEmpty || baseViewModel.isStreaming)
+//                // 清空按钮
+//                Button(action: baseViewModel.clearChat) {
+//                    Image(systemName: "trash")
+//                        .foregroundColor(.red)
+//                }
+//                .disabled(baseViewModel.messages.isEmpty || baseViewModel.isStreaming)
             }
         }
     }
@@ -260,9 +262,6 @@ struct ChatView: View {
     private func switchAPIProvider(_ provider: APIProvider) {
         // 切换API配置
         APIConfigurationStore.shared.currentProvider = provider
-
-        // 更新本地状态
-        currentProvider = provider
 
         // 显示提示
         LogTool.shared.debug("✅ 已切换到 \(provider.rawValue)")
