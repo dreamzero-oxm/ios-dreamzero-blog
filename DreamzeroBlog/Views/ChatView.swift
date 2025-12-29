@@ -15,6 +15,7 @@ struct ChatView: View {
 
     @Environment(\.modelContext) private var modelContext
     @State private var showSessionList: Bool = false
+    @State private var currentProvider: APIProvider = APIConfigurationStore.shared.currentProvider
 
     // 使用 Factory 创建的 ViewModel（不带 sessionStore）
     @State private var baseViewModel: ChatViewModel = Container.shared.chatViewModel()
@@ -143,6 +144,25 @@ struct ChatView: View {
                     Image(systemName: "plus.circle")
                 }
 
+                // API配置切换按钮
+                Menu {
+                    ForEach(APIProvider.allCases) { provider in
+                        Button(action: {
+                            switchAPIProvider(provider)
+                        }) {
+                            HStack {
+                                Text(provider.rawValue)
+                                if currentProvider == provider {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "gear")
+                        .foregroundColor(.secondary)
+                }
+
                 // 会话列表按钮
                 Button(action: { showSessionList = true }) {
                     Image(systemName: "ellipsis.circle")
@@ -209,6 +229,22 @@ struct ChatView: View {
         } else {
             proxy.scrollTo(lastMessage.id, anchor: .bottom)
         }
+    }
+
+    // MARK: - API Provider 切换
+
+    private func switchAPIProvider(_ provider: APIProvider) {
+        // 切换API配置
+        APIConfigurationStore.shared.currentProvider = provider
+
+        // 更新本地状态
+        currentProvider = provider
+
+        // 显示提示
+        LogTool.shared.debug("✅ 已切换到 \(provider.rawValue)")
+
+        // 重新创建chatViewModel以使用新配置
+        syncViewModel()
     }
 }
 
