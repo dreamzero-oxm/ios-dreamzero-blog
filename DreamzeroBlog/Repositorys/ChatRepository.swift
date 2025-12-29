@@ -29,11 +29,19 @@ protocol ChatRepositoryType {
 /// 聊天仓库实现
 final class ChatRepository: ChatRepositoryType {
     private let client: APIClient
-    private let apiKey: String
+    private let configuration: APIConfiguration
 
-    init(client: APIClient, apiKey: String) {
+    init(client: APIClient, configuration: APIConfiguration) {
         self.client = client
-        self.apiKey = apiKey
+        self.configuration = configuration
+    }
+
+    // 向后兼容：使用旧的apiKey参数初始化
+    convenience init(client: APIClient, apiKey: String) {
+        // 使用默认配置，只替换apiKey
+        var config = APIConfiguration.default
+        config.apiKey = apiKey
+        self.init(client: client, configuration: config)
     }
 
     func streamChat(
@@ -41,25 +49,34 @@ final class ChatRepository: ChatRepositoryType {
         model: String = "glm-4.7",
         temperature: Double? = nil
     ) async throws -> AsyncThrowingStream<String, Error> {
-        // 调试日志：检查 API Key
-        LogTool.shared.debug("🔑 使用 API Key: \(apiKey.isEmpty ? "空" : apiKey.prefix(20) + "...")")
+        // 使用配置中的模型名称（如果未指定）
+        let actualModel = model.isEmpty || model == "glm-4.7" ? configuration.model : model
 
-        // 创建Endpoint（包含API Key）
+        // 调试日志：检查 API 配置
+        LogTool.shared.debug("🔑 使用 API 配置: \(configuration.provider.rawValue)")
+        LogTool.shared.debug("📡 API URL: \(configuration.apiURL)")
+        LogTool.shared.debug("🤖 模型: \(actualModel)")
+        LogTool.shared.debug("🔑 API Key: \(configuration.apiKey.isEmpty ? "空" : configuration.apiKey.prefix(20) + "...")")
+        LogTool.shared.debug("🔐 使用JWT: \(configuration.useJWT)")
+
+        // 创建Endpoint（包含API配置）
         let endpoint = ChatCompletionEndpoint(
-            model: model,
+            model: actualModel,
             messages: messages,
             stream: true,
             temperature: temperature,
-            apiKey: apiKey
+            apiKey: configuration.apiKey,
+            useJWT: configuration.useJWT
         )
 
-        // 获取智谱AI的baseURL
-        guard let zhipuURL = URL(string: ZHIPU_AI_BASE_URL) else {
+        // 获取配置中的API URL
+        guard let apiURL = URL(string: configuration.apiURL) else {
+            LogTool.shared.error("无效的API URL: \(configuration.apiURL)")
             throw APIError.invalidResponse
         }
 
         // 使用APIClient的流式请求方法
-        let jsonStream = try await client.streamRequest(endpoint, customBaseURL: zhipuURL)
+        let jsonStream = try await client.streamRequest(endpoint, customBaseURL: apiURL)
 
         // 创建新的流来处理JSON解析和内容提取
         return AsyncThrowingStream { continuation in

@@ -23,11 +23,11 @@ extension Container {
     // 注册 ChatRepository（智谱AI）
     var chatRepository: Factory<ChatRepositoryType> {
         self {
-            let apiKey = self.zhipuAPIKey()
-            LogTool.shared.debug("🔧 ChatRepository 注入 API Key: \(apiKey.isEmpty ? "空" : apiKey.prefix(20) + "...")")
+            let config = self.apiConfiguration()
+            LogTool.shared.debug("🔧 ChatRepository 注入 API配置: \(config.provider.rawValue), URL: \(config.apiURL)")
             return ChatRepository(
                 client: self.apiClient(),
-                apiKey: apiKey
+                configuration: config
             )
         }
     }

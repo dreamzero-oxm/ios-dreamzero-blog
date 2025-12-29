@@ -9,10 +9,21 @@ import Factory
 import Foundation
 
 extension Container {
-    /// 智谱AI API Key
+    /// API配置
+    /// 使用 .cached 确保配置变化时能够及时更新
+    var apiConfiguration: Factory<APIConfiguration> {
+        self { APIConfigurationStore.shared.currentConfiguration }.cached
+    }
+
+    /// 智谱AI API Key（向后兼容）
     /// 使用 .cached 确保只计算一次，避免多次读取导致的不一致
     var zhipuAPIKey: Factory<String> {
         self { () -> String in
+            // 优先级0: 从APIConfigurationStore读取
+            let config = APIConfigurationStore.shared.currentConfiguration
+            if !config.apiKey.isEmpty {
+                return config.apiKey
+            }
             #if DEBUG
             // Debug 模式：优先从环境变量读取（开发时使用）
             if let apiKey = ProcessInfo.processInfo.environment["ZHIPU_API_KEY"], !apiKey.isEmpty {
