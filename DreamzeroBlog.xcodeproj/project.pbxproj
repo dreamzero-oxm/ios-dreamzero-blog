@@ -21,9 +21,22 @@
 		44EFA5D12EABAE7A009BB169 /* DreamzeroBlog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DreamzeroBlog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		448AD00D2F024F7B00E56C81 /* Exceptions for "DreamzeroBlog" folder in "DreamzeroBlog" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 44EFA5D02EABAE7A009BB169 /* DreamzeroBlog */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		44EFA5D32EABAE7A009BB169 /* DreamzeroBlog */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				448AD00D2F024F7B00E56C81 /* Exceptions for "DreamzeroBlog" folder in "DreamzeroBlog" target */,
+			);
 			path = DreamzeroBlog;
 			sourceTree = "<group>";
 		};
@@ -293,8 +306,10 @@
 				DEVELOPMENT_TEAM = 4D9V23XMD7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DreamzeroBlog/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DreamZero;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "保存图片到您的相册";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -327,8 +342,10 @@
 				DEVELOPMENT_TEAM = 4D9V23XMD7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DreamzeroBlog/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DreamZero;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.books";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "保存图片到您的相册";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
