@@ -77,7 +77,15 @@ final class ChatViewModel {
         }
         state = .loading
         currentSession = session
-        messages = session.messages
+
+        // 按时间戳排序消息（双重保障）
+        messages = session.messages.sorted { lhs, rhs in
+            if lhs.timestamp != rhs.timestamp {
+                return lhs.timestamp < rhs.timestamp
+            }
+            return lhs.id < rhs.id
+        }
+
         hasGeneratedTitle = !session.title.isEmpty && session.title != "新对话"
         state = .loaded
     }
@@ -254,8 +262,13 @@ final class ChatViewModel {
                 }
             }
 
-            // 添加错误消息气泡
-            let errorBubble = ChatMessage(role: .system, content: errorMessage)
+            // 添加错误消息气泡（使用确定性ID，避免重新加载时位置变化）
+            let errorId = "error-\(errorMessage.hashValue)"
+            let errorBubble = ChatMessage(
+                id: errorId,
+                role: .system,
+                content: errorMessage
+            )
             messages.append(errorBubble)
             currentSession.messages.append(errorBubble)
 
