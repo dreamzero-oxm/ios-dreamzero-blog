@@ -28,10 +28,10 @@ struct ContentView: View {
                     Label("AI聊天", systemImage: "message")
                 }
             
-            // Login Tab
-            LoginView()
+            // Settings Tab
+            SettingsView()
                 .tabItem {
-                    Label("我的", systemImage: "person.crop.circle")
+                    Label("设置", systemImage: "gearshape")
                 }
             
         }
