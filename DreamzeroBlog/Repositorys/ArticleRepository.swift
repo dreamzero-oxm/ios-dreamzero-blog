@@ -68,25 +68,29 @@ final class ArticleRepository: ArticleRepositoryType {
             endpoint,
             as: SingleResponse<ArticleListResponseData>.self
         )
-        
 
         // 检查业务状态码
         guard response.code == 0 else {
             throw APIError.server(code: response.code, message: response.msg)
         }
 
+        // 检查 data
+        guard let data = response.data else {
+            throw APIError.invalidResponse
+        }
+
         // 转换 DTO 为领域模型
-        let articles = response.data.articles.map { Article(from: $0) }
+        let articles = data.articles.map { Article(from: $0) }
 
         // 打印日志
-        LogTool.shared.debug("Fetched \(articles.count) articles, total: \(response.data.total)")
+        LogTool.shared.debug("Fetched \(articles.count) articles, total: \(data.total)")
 
         // 构造分页数据
         return ArticleListPage(
             articles: articles,
-            total: response.data.total,
-            page: response.data.page,
-            pageSize: response.data.pageSize
+            total: data.total,
+            page: data.page,
+            pageSize: data.pageSize
         )
     }
 
@@ -105,8 +109,13 @@ final class ArticleRepository: ArticleRepositoryType {
             throw APIError.server(code: response.code, message: response.msg)
         }
 
+        // 检查 data
+        guard let data = response.data else {
+            throw APIError.invalidResponse
+        }
+
         // 转换 DTO 为领域模型
-        let article = Article(from: response.data)
+        let article = Article(from: data)
 
         // 打印日志
         LogTool.shared.debug("Fetched article detail: \(article.title)")

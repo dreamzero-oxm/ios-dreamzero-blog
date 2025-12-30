@@ -48,9 +48,29 @@ final class AuthInterceptor: RequestInterceptor {
     ) {
         var request = urlRequest
 
+        // 从 URL 查询参数中提取元数据（由 APIRequestConvertible 设置）
+        let requiresAuth = extractRequiresAuth(from: request.url)
+        let hasCustomAuthHeader = extractHasCustomAuth(from: request.url)
+
+        LogTool.shared.debug("🔑 requiresAuth: \(requiresAuth), hasCustomAuthHeader: \(hasCustomAuthHeader)")
+        // 仅在以下条件都满足时附加 token：
+        // 1. requiresAuth == true，且
+        // 2. 没有自定义 Authorization 头
+        guard requiresAuth, !hasCustomAuthHeader else {
+            // 跳过 token 附加：
+            // - 公开端点（requiresAuth == false）
+            // - 有自定义 Authorization 头的端点
+            completion(.success(request))
+            return
+        }
+
+        LogTool.shared.debug("🔑 从 TokenStore 读取 accessToken 与 tokenType")
+
         // 从 TokenStore 读取 accessToken 与 tokenType
         let accessToken = try? tokenStore?.currentAccessToken()
         let tokenType = try? tokenStore?.currentTokens()?.tokenType
+
+        LogTool.shared.debug("🔑 accessToken: \(accessToken ?? "空"), tokenType: \(tokenType ?? "空")")
 
         if let token = accessToken, !token.isEmpty {
             // 若有 tokenType 优先使用，例如 "Bearer <token>" / "JWT <token>"
@@ -63,10 +83,33 @@ final class AuthInterceptor: RequestInterceptor {
             let value = "\(prefix) \(token)"
             var headers = request.headers
             headers.update(name: "Authorization", value: value)
+            LogTool.shared.debug("Attached Authorization header: \(value)")
             request.headers = headers
         }
 
         completion(.success(request))
+    }
+
+    // MARK: - Metadata Extraction Helpers
+
+    /// 从 URL 查询参数中提取 requiresAuth 标志
+    private func extractRequiresAuth(from url: URL?) -> Bool {
+        guard let url = url,
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let queryItems = components.queryItems else {
+            return true // 安全默认值
+        }
+        return queryItems.first(where: { $0.name == "_requiresAuth" })?.value != "false"
+    }
+
+    /// 从 URL 查询参数中提取 hasCustomAuthHeader 标志
+    private func extractHasCustomAuth(from url: URL?) -> Bool {
+        guard let url = url,
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let queryItems = components.queryItems else {
+            return false
+        }
+        return queryItems.first(where: { $0.name == "_hasCustomAuth" })?.value == "true"
     }
 
     // MARK: - 2) Retry on 401 with token refresh
@@ -125,14 +168,14 @@ final class AuthInterceptor: RequestInterceptor {
                 }
 
                 // 3) 持久化
-                try await tokenStore?.save(merged)
+                try tokenStore?.save(merged)
 
                 // 4) 广播：允许所有排队请求重试
                 flushQueue(with: .retry)
 
             } catch {
                 // 刷新失败：清理本地 token，阻止重试
-                _ = try? await tokenStore?.clear()
+                _ = try? tokenStore?.clear()
                 flushQueue(with: .doNotRetry)
             }
         }

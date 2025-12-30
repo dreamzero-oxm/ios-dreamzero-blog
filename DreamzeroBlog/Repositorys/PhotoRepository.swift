@@ -25,8 +25,12 @@ final class PhotoRepository: PhotoRepositoryType {
             // 依据你的项目约定把业务错误往上抛
             throw APIError.server(code: resp.code, message: resp.msg)
         }
+        // 检查 data
+        guard let data = resp.data else {
+            throw APIError.invalidResponse
+        }
         // 打印日志
-        LogTool.shared.debug("Fetched \(resp.data) photos.")
-        return resp.data.photos
+        LogTool.shared.debug("Fetched \(data.photos.count) photos.")
+        return data.photos
     }
 }

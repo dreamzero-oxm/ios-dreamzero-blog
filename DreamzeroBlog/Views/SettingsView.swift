@@ -9,17 +9,34 @@ import SwiftUI
 
 /// 设置页面主视图
 struct SettingsView: View {
-    @State private var showAccountSettings = false
+    @State private var showUserProfile = false
+    @State private var showLogin = false
     @State private var showAPIConfig = false
     @State private var showRAGSettings = false
 
     var body: some View {
         NavigationStack {
             List {
-                // 账号设置
+                // 账号/个人资料/登录
                 Section {
-                    Button(action: { showAccountSettings = true }) {
-                        Label("账号", systemImage: "person.circle")
+                    if AuthSessionManager.shared.isAuthenticated {
+                        // 已登录：显示个人资料
+                        Button(action: { showUserProfile = true }) {
+                            HStack {
+                                Label("个人资料", systemImage: "person.circle")
+                                Spacer()
+                                if let user = AuthSessionManager.shared.currentUser {
+                                    Text(user.nickname)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    } else {
+                        // 未登录：显示登录按钮
+                        Button(action: { showLogin = true }) {
+                            Label("登录", systemImage: "person.circle")
+                                .foregroundStyle(.blue)
+                        }
                     }
                 }
 
@@ -66,8 +83,11 @@ struct SettingsView: View {
             }
             .navigationTitle("设置")
         }
-        .sheet(isPresented: $showAccountSettings) {
+        .sheet(isPresented: $showLogin) {
             AccountSettingsView()
+        }
+        .sheet(isPresented: $showUserProfile) {
+            UserProfileView()
         }
         .sheet(isPresented: $showAPIConfig) {
             APIConfigView()

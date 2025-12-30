@@ -20,6 +20,11 @@ extension Container {
         self { ArticleRepository(client: self.apiClient()) }
     }
 
+    // 注册 UserRepository
+    var userRepository: Factory<UserRepositoryType> {
+        self { UserRepository(client: self.apiClient()) }
+    }
+
     // 注册 ChatRepository（智谱AI）
     // 不使用 .cached，确保每次都获取最新配置
     var chatRepository: Factory<ChatRepositoryType> {

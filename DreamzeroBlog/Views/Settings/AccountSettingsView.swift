@@ -11,16 +11,14 @@ import SwiftUI
 /// 包含原有的登录界面内容
 struct AccountSettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var username = ""
-    @State private var password = ""
-    @State private var isLoading = false
+    @State private var viewModel = LoginViewModel()
     @State private var showPassword = false
     @State private var showRegisterSheet = false
 
     @FocusState private var focusedField: Field?
 
     enum Field {
-        case username, password
+        case account, password
     }
 
     var body: some View {
@@ -51,10 +49,10 @@ struct AccountSettingsView: View {
                             .foregroundStyle(.secondary)
                             .frame(width: 20)
 
-                        TextField("用户名", text: $username)
+                        TextField("用户名", text: $viewModel.account)
                             .textContentType(.username)
                             .autocapitalization(.none)
-                            .focused($focusedField, equals: .username)
+                            .focused($focusedField, equals: .account)
                             .onSubmit {
                                 focusedField = .password
                             }
@@ -71,11 +69,11 @@ struct AccountSettingsView: View {
                             .frame(width: 20)
 
                         if showPassword {
-                            TextField("密码", text: $password)
+                            TextField("密码", text: $viewModel.password)
                                 .textContentType(.password)
                                 .focused($focusedField, equals: .password)
                         } else {
-                            SecureField("密码", text: $password)
+                            SecureField("密码", text: $viewModel.password)
                                 .textContentType(.password)
                                 .focused($focusedField, equals: .password)
                         }
@@ -93,8 +91,15 @@ struct AccountSettingsView: View {
                     .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
 
                     // 登录按钮
-                    Button(action: login) {
-                        if isLoading {
+                    Button(action: {
+                        Task {
+                            await viewModel.login()
+                            if viewModel.loginSuccess {
+                                dismiss()
+                            }
+                        }
+                    }) {
+                        if viewModel.isLoading {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
@@ -107,7 +112,7 @@ struct AccountSettingsView: View {
                     .padding()
                     .background(
                         LinearGradient(
-                            colors: username.isEmpty || password.isEmpty ?
+                            colors: !viewModel.isValid ?
                                 [Color.blue.opacity(0.5)] :
                                 [Color.blue, Color.blue.opacity(0.8)],
                             startPoint: .topLeading,
@@ -115,7 +120,7 @@ struct AccountSettingsView: View {
                         )
                     )
                     .cornerRadius(12)
-                    .disabled(username.isEmpty || password.isEmpty || isLoading)
+                    .disabled(!viewModel.isValid || viewModel.isLoading)
                 }
                 .padding(.horizontal, 20)
 
@@ -147,25 +152,28 @@ struct AccountSettingsView: View {
                 }
             }
         }
+        .onSubmit {
+            switch focusedField {
+            case .account:
+                focusedField = .password
+            case .password:
+                Task {
+                    await viewModel.login()
+                    if viewModel.loginSuccess {
+                        dismiss()
+                    }
+                }
+            case .none:
+                break
+            }
+        }
+        .alert("登录失败", isPresented: $viewModel.showError) {
+            Button("确定") {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
         .sheet(isPresented: $showRegisterSheet) {
             RegisterView()
-        }
-    }
-
-    // MARK: - Login Action
-
-    private func login() {
-        guard !username.isEmpty, !password.isEmpty else {
-            return
-        }
-
-        isLoading = true
-
-        // TODO: 实现实际的登录API调用
-        // 当前是模拟实现
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isLoading = false
-            LogTool.shared.debug("登录: \(username)")
         }
     }
 }

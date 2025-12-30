@@ -14,5 +14,5 @@ struct Response<T: Decodable>: Decodable {
 struct SingleResponse<T: Decodable>: Decodable {
     let code: Int
     let msg: String
-    let data: T
+    let data: T?
 }
