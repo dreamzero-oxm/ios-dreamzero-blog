@@ -110,3 +110,8 @@ public struct UpdateProfileResponseData: Decodable {
     public let success: Bool
     public let message: String
 }
+
+/// Validate access token response data
+public struct ValidateAccessTokenResponseData: Decodable {
+    public let valid: Bool
+}

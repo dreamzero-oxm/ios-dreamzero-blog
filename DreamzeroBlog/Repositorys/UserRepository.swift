@@ -50,6 +50,10 @@ protocol UserRepositoryType {
     ///   - fileName: File name
     /// - Returns: Avatar URL
     func uploadAvatar(imageData: Data, fileName: String) async throws -> String
+
+    /// Validate current access token
+    /// - Returns: True if token is valid, false otherwise
+    func validateAccessToken() async throws -> Bool
 }
 
 // MARK: - Implementation
@@ -197,5 +201,25 @@ final class UserRepository: UserRepositoryType, TokenRefresher {
         }
 
         return data.avatarURL ?? ""
+    }
+
+    // MARK: - Token Validation
+
+    func validateAccessToken() async throws -> Bool {
+        let endpoint = ValidateAccessTokenEndpoint()
+        let response: SingleResponse<ValidateAccessTokenResponseData> = try await client.request(
+            endpoint,
+            as: SingleResponse<ValidateAccessTokenResponseData>.self
+        )
+
+        guard response.code == 0 else {
+            throw APIError.server(code: response.code, message: response.msg)
+        }
+
+        guard let data = response.data else {
+            throw APIError.invalidResponse
+        }
+
+        return data.valid
     }
 }

@@ -13,13 +13,22 @@ struct SettingsView: View {
     @State private var showLogin = false
     @State private var showAPIConfig = false
     @State private var showRAGSettings = false
+    @State private var isValidatingToken = false
 
     var body: some View {
         NavigationStack {
             List {
                 // 账号/个人资料/登录
                 Section {
-                    if AuthSessionManager.shared.isAuthenticated {
+                    if isValidatingToken {
+                        // 验证中显示加载状态
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("验证中...")
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if AuthSessionManager.shared.isAuthenticated {
                         // 已登录：显示个人资料
                         Button(action: { showUserProfile = true }) {
                             HStack {
@@ -94,6 +103,28 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showRAGSettings) {
             RAGSettingsView()
+        }
+        .onAppear {
+            validateTokenIfNeeded()
+        }
+    }
+
+    // MARK: - Token Validation
+
+    private func validateTokenIfNeeded() {
+        
+        isValidatingToken = true
+
+        Task {
+            let isValid = await AuthSessionManager.shared.validateAccessToken()
+
+            await MainActor.run {
+                isValidatingToken = false
+                if !isValid {
+                    // Token 无效，清除认证状态
+                    AuthSessionManager.shared.logout()
+                }
+            }
         }
     }
 }

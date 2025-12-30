@@ -98,6 +98,28 @@ final class AuthSessionManager {
         }
     }
 
+    // MARK: - Validate Access Token
+
+    /// Validate the current access token without modifying state
+    /// - Returns: True if token is valid, false otherwise
+    func validateAccessToken() async -> Bool {
+        // First check if tokens exist locally
+        guard let tokens = try? tokenStore.currentTokens(),
+              !tokens.accessToken.isEmpty else {
+            return false
+        }
+
+        // Validate with API
+        do {
+            let isValid = try await userRepository.validateAccessToken()
+            isAuthenticated = isValid
+            return isValid
+        } catch {
+            // Token validation failed
+            return false
+        }
+    }
+
     // MARK: - Refresh User Data
 
     func refreshUserData() async throws {

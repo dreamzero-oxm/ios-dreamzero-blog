@@ -2,5 +2,5 @@ buildServer.json
 .claude/
 
 # 敏感配置文件
-Secrets.xcconfig
+# Secrets.xcconfig
 *.xcconfigSecrets

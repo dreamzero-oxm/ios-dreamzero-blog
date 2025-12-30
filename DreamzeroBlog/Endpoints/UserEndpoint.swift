@@ -152,3 +152,14 @@ public struct UploadAvatarEndpoint: APIEndpoint {
     }
     public var requiresAuth: Bool { true }
 }
+
+// MARK: - Validate Access Token Endpoint
+
+/// Validate access token endpoint
+/// GET /api/v1/user/validateAccessToken
+public struct ValidateAccessTokenEndpoint: APIEndpoint {
+    public var path: String { "/api/v1/user/validateAccessToken" }
+    public var method: HTTPMethod { .get }
+    public var encoder: ParameterEncoder { URLEncodedFormParameterEncoder.default }
+    public var requiresAuth: Bool { true }
+}
