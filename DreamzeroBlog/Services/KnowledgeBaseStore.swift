@@ -57,6 +57,7 @@ final class KnowledgeBaseStore: KnowledgeBaseStoreType {
             existing.content = document.content
             existing.sourceType = document.sourceType
             existing.sourcePath = document.sourcePath
+            existing.isDefault = document.isDefault
             existing.updatedAt = Date()
 
             // 删除旧的分块
@@ -76,6 +77,7 @@ final class KnowledgeBaseStore: KnowledgeBaseStoreType {
                 content: document.content,
                 sourceType: document.sourceType,
                 sourcePath: document.sourcePath,
+                isDefault: document.isDefault,
                 createdAt: document.createdAt,
                 updatedAt: document.updatedAt
             )
@@ -143,6 +145,7 @@ extension KBDocumentModel {
             content: content,
             sourceType: sourceType,
             sourcePath: sourcePath,
+            isDefault: isDefault,
             createdAt: createdAt,
             updatedAt: updatedAt,
             chunks: chunks.map { $0.toDomainModel() }

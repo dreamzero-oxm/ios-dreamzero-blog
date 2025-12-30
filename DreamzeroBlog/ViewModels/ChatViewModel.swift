@@ -9,6 +9,11 @@ import Foundation
 import Observation
 import Factory
 
+// 通知名称扩展
+extension Notification.Name {
+    static let streamContentDidUpdate = Notification.Name("streamContentDidUpdate")
+}
+
 @MainActor
 @Observable
 final class ChatViewModel {
@@ -26,10 +31,17 @@ final class ChatViewModel {
     var isStreaming: Bool = false  // 是否正在接收流式响应
     var inputText: String = ""     // 用户输入的文本
 
-    // 流式更新节流 - 私有状态，不触发观察
-    private var streamingContent: String = ""
-    private var lastUpdateTime: Date = .distantPast
-    private let updateInterval: TimeInterval = 0.08  // 80ms 更新一次（约12fps）
+    // 流式更新节流 - 使用 @ObservationIgnored 避免触发 UI 更新
+    @ObservationIgnored private var streamingContent: String = ""
+    @ObservationIgnored private var lastUpdateTime: Date = .distantPast
+    private let updateInterval: TimeInterval = 0.1  // 100ms 更新一次（10fps），降低更新频率
+
+    // 存储当前流式传输的 Task，用于取消
+    private var streamingTask: Task<Void, Never>?
+
+    // 临时存储当前消息的来源（知识库和联网搜索）
+    private var currentKnowledgeSources: [MessageSource] = []
+    private var currentWebSources: [MessageSource] = []
 
     // 配置
     private let model: String = "glm-4.7"
@@ -184,17 +196,47 @@ final class ChatViewModel {
         isStreaming = true
         state = .loading
 
-        Task {
+        streamingTask = Task {
             await streamResponse(userMessage: userMessage)
             // 流式传输完成后保存会话
             await saveCurrentSession()
+            streamingTask = nil
         }
+    }
+
+    /// 停止当前流式传输
+    func stopStreaming() {
+        guard let task = streamingTask, !task.isCancelled else { return }
+
+        // 取消任务
+        task.cancel()
+
+        // 标记最后一条消息为已打断
+        if let lastIndex = messages.indices.last,
+           messages[lastIndex].role == .assistant {
+            messages[lastIndex].isStreaming = false
+            // 添加打断标记
+            if !messages[lastIndex].content.isEmpty {
+                messages[lastIndex].content += "\n\n*（回答已打断）*"
+            }
+            currentSession.messages[lastIndex].isStreaming = false
+            currentSession.messages[lastIndex].content = messages[lastIndex].content
+        }
+
+        // 重置状态
+        isStreaming = false
+        state = .loaded
+        streamingTask = nil
     }
 
     // MARK: - 流式接收响应
 
     /// 使用 RAG 增强查询
     private func enhanceQueryWithRAG(_ query: String) async -> String {
+        // 清空临时存储
+        currentKnowledgeSources = []
+        currentWebSources = []
+
         // 检查 RAG 是否启用
         LogTool.shared.debug("RAG isEnabled: \(ragConfig.isEnabled)")
         guard ragConfig.isEnabled else { return query }
@@ -227,6 +269,15 @@ final class ChatViewModel {
                     let documents = try await store.fetchAllDocuments()
                     let documentMap = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0.title) })
 
+                    // 保存到临时变量
+                    currentKnowledgeSources = results.map { result in
+                        MessageSource(
+                            type: .knowledgeBase,
+                            title: documentMap[result.chunk.documentId] ?? "未知文档",
+                            similarity: result.similarity
+                        )
+                    }
+
                     // 构建上下文
                     context = results.map { result in
                         let title = documentMap[result.chunk.documentId] ?? "未知文档"
@@ -247,6 +298,15 @@ final class ChatViewModel {
             do {
                 let webResults = try await webService.search(query: query)
                 if !webResults.isEmpty {
+                    // 保存到临时变量
+                    currentWebSources = webResults.map { result in
+                        MessageSource(
+                            type: .webSearch,
+                            title: result.title,
+                            url: result.url
+                        )
+                    }
+
                     webContext = webResults.map { result in
                         "[\(result.title)](\(result.url))\n\(result.content)"
                     }.joined(separator: "\n\n")
@@ -292,6 +352,12 @@ final class ChatViewModel {
             // RAG 增强查询
             let enhancedContent = await enhanceQueryWithRAG(userMessage.content)
 
+            // 更新助手消息的 sources
+            if let index = messages.indices.last, messages[index].role == .assistant {
+                messages[index].sources = currentKnowledgeSources + currentWebSources
+                currentSession.messages[index].sources = currentKnowledgeSources + currentWebSources
+            }
+
             // 发送最后5条消息（包含当前用户问题），保持对话上下文
             let recentMessages = Array(messages.suffix(5).dropLast())
             let messageDtos = recentMessages.map { msg in
@@ -329,7 +395,9 @@ final class ChatViewModel {
             // 流式传输完成
             if let index = messages.indices.last {
                 messages[index].isStreaming = false
+                messages[index].prefersMarkdown = true  // 启用 Markdown 渲染
                 currentSession.messages[index].isStreaming = false
+                currentSession.messages[index].prefersMarkdown = true
             }
             self.isStreaming = false
             self.state = .loaded
@@ -402,6 +470,9 @@ final class ChatViewModel {
         // 只更新内容，避免触发整个数组变化
         messages[index].content = streamingContent
         currentSession.messages[index].content = streamingContent
+
+        // 发送通知以触发滚动
+        NotificationCenter.default.post(name: .streamContentDidUpdate, object: nil)
     }
 
     // MARK: - 其他操作

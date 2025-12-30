@@ -9,6 +9,16 @@ import Factory
 import SwiftData
 
 extension Container {
+    /// 共享的 ModelContainer - 由 DreamzeroBlogApp 设置
+    var sharedModelContainer: Factory<ModelContainer?> {
+        self { nil }.cached
+    }
+
+    /// 设置共享的 ModelContainer
+    func registerSharedModelContainer(_ container: ModelContainer) {
+        self.sharedModelContainer.register { container }
+    }
+
     /// 嵌入服务
     var embeddingService: Factory<EmbeddingServiceType> {
         self { EmbeddingService() }
@@ -29,32 +39,26 @@ extension Container {
         self { WebSearchService() }
     }
 
-    /// 知识库存储 - 需要在运行时提供 ModelContext
+    /// 知识库存储 - 使用共享的 ModelContainer
     var knowledgeBaseStore: Factory<KnowledgeBaseStoreType> {
         self { @MainActor in
-            // 获取当前 ModelContainer 中的 ModelContext
-            // 注意：这需要在 SwiftUI 视图中通过 @Environment(\.modelContext) 传入
-            // 这里使用一个临时的解决方案
-            let container = Self.sharedModelContainer()
+            guard let container = self.sharedModelContainer() else {
+                fatalError("ModelContainer not registered. Call registerSharedModelContainer first.")
+            }
             let context = ModelContext(container)
             return KnowledgeBaseStore(modelContext: context)
         }
     }
 
-    /// 辅助方法：获取共享的 ModelContainer
-    private static func sharedModelContainer() -> ModelContainer {
-        let schema = Schema([
-            ChatSessionModel.self,
-            ChatMessageModel.self,
-            KBDocumentModel.self,
-            KBChunkModel.self
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
+    /// 默认知识同步服务
+    var defaultKnowledgeService: Factory<DefaultKnowledgeServiceType> {
+        self { @MainActor in DefaultKnowledgeService(
+            articleRepository: self.articleRepository(),
+            photoRepository: self.photoRepository(),
+            knowledgeBaseStore: self.knowledgeBaseStore(),
+            chunkingService: self.chunkingService(),
+            embeddingService: self.embeddingService(),
+            ragConfig: RAGConfigurationStore.shared
+        )}
     }
 }

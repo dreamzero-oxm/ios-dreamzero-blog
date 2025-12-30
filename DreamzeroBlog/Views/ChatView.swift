@@ -74,8 +74,22 @@ struct ChatView: View {
                 }
         }
         .onAppear {
-            // 初始化时同步 baseViewModel 的状态
+            // 如果显示正在流式传输但没有实际的任务，重置状态
+            if baseViewModel.isStreaming {
+                // 检查是否有正在流式的消息
+                let hasStreamingMessage = baseViewModel.messages.contains { $0.isStreaming }
+                if !hasStreamingMessage {
+                    // 没有正在流式的消息但状态显示为流式中，重置状态
+                    baseViewModel.stopStreaming()
+                }
+            }
             syncViewModel()
+        }
+        .onDisappear {
+            // 页面消失时取消正在进行的流式传输
+            if baseViewModel.isStreaming {
+                baseViewModel.stopStreaming()
+            }
         }
     }
 
@@ -89,11 +103,18 @@ struct ChatView: View {
             embeddingService: Container.shared.embeddingService(),
             webSearchService: Container.shared.webSearchService()
         )
+
+        // 检查是否有正在流式的消息
+        let hasStreamingMessage = baseViewModel.messages.contains { $0.isStreaming }
+
         vm.messages = baseViewModel.messages
         vm.currentSession = baseViewModel.currentSession
         vm.state = baseViewModel.state
-        vm.isStreaming = baseViewModel.isStreaming
+
+        // 如果没有实际正在流式的消息，重置状态
+        vm.isStreaming = hasStreamingMessage ? baseViewModel.isStreaming : false
         vm.inputText = baseViewModel.inputText
+
         baseViewModel = vm
     }
 
@@ -126,6 +147,9 @@ struct ChatView: View {
             if baseViewModel.isStreaming {
                 scrollToBottom(proxy: proxy, animated: false)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .streamContentDidUpdate)) { _ in
+            scrollToBottom(proxy: proxy, animated: false)
         }
     }
 
@@ -236,21 +260,14 @@ struct ChatView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(20)
                     .lineLimit(1...6)
+                    .disabled(baseViewModel.isStreaming)
 
-                // 发送按钮
-                Button(action: {
-                    baseViewModel.sendMessage()
-                    isInputFocused = false
-                }) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 40))
-                        .foregroundColor(canSendMessage ? .blue : .gray)
-                }
-                .disabled(!canSendMessage || baseViewModel.isStreaming)
+                // 使用新的条件按钮
+                inputActionButton
             }
             .padding([.horizontal, .top])
             .padding(.bottom, 4)
-            
+
             Text("内容由AI生成，请仔细甄别")
                 .font(.caption2)
                 .foregroundColor(.secondary)
@@ -263,6 +280,31 @@ struct ChatView: View {
 
     private var canSendMessage: Bool {
         !baseViewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    @ViewBuilder
+    private var inputActionButton: some View {
+        if baseViewModel.isStreaming {
+            // 停止按钮
+            Button(action: {
+                baseViewModel.stopStreaming()
+            }) {
+                Image(systemName: "stop.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.red)
+            }
+        } else {
+            // 发送按钮
+            Button(action: {
+                baseViewModel.sendMessage()
+                isInputFocused = false
+            }) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(canSendMessage ? .blue : .gray)
+            }
+            .disabled(!canSendMessage)
+        }
     }
 
     private func scrollToBottom(proxy: ScrollViewProxy, animated: Bool = true) {
@@ -470,6 +512,12 @@ struct MessageBubble: View, Equatable {
             roleLabelView
             messageContentView
             streamingIndicator
+
+            // 添加来源列表（仅助手消息）
+            if message.role == .assistant && !message.sources.isEmpty {
+                MessageSourcesView(sources: message.sources)
+            }
+
             copyButton
         }
         .frame(maxWidth: 300, alignment: message.role == .user ? .trailing : .leading)
@@ -487,7 +535,11 @@ struct MessageBubble: View, Equatable {
         Group {
             if message.role == .user {
                 userMessageView
+            } else if message.isStreaming || !message.prefersMarkdown {
+                // 流式输出时：使用纯文本渲染（高性能）
+                plainTextView
             } else {
+                // 流式结束后：使用 Markdown 渲染（完整格式）
                 assistantMessageView
             }
         }
@@ -508,6 +560,21 @@ struct MessageBubble: View, Equatable {
             .padding(12)
             .background(backgroundColor)
             .cornerRadius(16)
+    }
+
+    // 纯文本视图（流式输出时使用，避免 Markdown 重复解析）
+    private var plainTextView: some View {
+        Text(message.content)
+            .font(.body)
+            .foregroundColor(.primary)
+            .padding(12)
+            .background(backgroundColor)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(borderColor, lineWidth: 0.5)
+            )
+            .textSelection(.enabled)
     }
 
     private var assistantMessageView: some View {
@@ -560,7 +627,10 @@ struct MessageBubble: View, Equatable {
     }
 
     static func == (lhs: MessageBubble, rhs: MessageBubble) -> Bool {
-        lhs.message == rhs.message
+        lhs.message.id == rhs.message.id &&
+        lhs.message.isStreaming == rhs.message.isStreaming &&
+        lhs.message.prefersMarkdown == rhs.message.prefersMarkdown &&
+        lhs.message.content.count == rhs.message.content.count
     }
 
     private var roleLabel: String {
@@ -643,6 +713,127 @@ func copyToClipboard(_ text: String) {
     #elseif os(iOS)
         UIPasteboard.general.string = text
     #endif
+}
+
+// MARK: - 消息来源列表
+
+struct MessageSourcesView: View {
+    let sources: [MessageSource]
+
+    @State private var showAll: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // 来源列表标题/折叠按钮（仅超过3条时显示）
+            if sources.count > 3 {
+                Button(action: { showAll.toggle() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+
+                        Text(sourceSummary)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+
+                        Image(systemName: showAll ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+
+            // 来源列表（默认显示前三条，点击后显示全部）
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(displayedSources) { source in
+                    SourceRow(source: source)
+                }
+            }
+            .padding(.leading, 4)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(.systemGray6).opacity(0.5))
+        .cornerRadius(8)
+    }
+
+    /// 计算要显示的来源列表
+    private var displayedSources: [MessageSource] {
+        if sources.count <= 3 || showAll {
+            return sources
+        }
+        return Array(sources.prefix(3))
+    }
+
+    private var sourceSummary: String {
+        let webCount = sources.filter { $0.type == .webSearch }.count
+        let kbCount = sources.filter { $0.type == .knowledgeBase }.count
+
+        if webCount > 0 && kbCount > 0 {
+            return "引用 \(webCount) 个网络来源 · \(kbCount) 个知识库文件"
+        } else if webCount > 0 {
+            return "引用 \(webCount) 个网络来源"
+        } else if kbCount > 0 {
+            return "引用 \(kbCount) 个知识库文件"
+        }
+        return "来源引用"
+    }
+}
+
+struct SourceRow: View {
+    let source: MessageSource
+
+    var body: some View {
+        Group {
+            if source.type == .webSearch, let url = source.url {
+                // 联网搜索结果 - 可点击
+                if let validUrl = URL(string: url) {
+                    Link(destination: validUrl) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "safari")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+                            Text(source.title)
+                                .font(.caption)
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                    }
+                } else {
+                    // URL 无效时的降级显示
+                    HStack(spacing: 4) {
+                        Image(systemName: "safari")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                        Text(source.title)
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                }
+            } else {
+                // 知识库文件 - 仅展示
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.text")
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                    Text(source.title)
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    if let similarity = source.similarity {
+                        Text(String(format: "%.1f%%", similarity * 100))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+            }
+        }
+    }
 }
 
 // MARK: - 预览

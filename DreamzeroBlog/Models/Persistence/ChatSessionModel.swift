@@ -41,6 +41,9 @@ final class ChatMessageModel {
     var isStreaming: Bool
     var session: ChatSessionModel?
 
+    // 存储 MessageSource 数组的 JSON 数据
+    var sourcesData: Data?
+
     init(
         id: String = UUID().uuidString,
         role: MessageRole,
@@ -53,11 +56,23 @@ final class ChatMessageModel {
         self.content = content
         self.timestamp = timestamp
         self.isStreaming = isStreaming
+        self.sourcesData = nil
     }
 
     /// 计算属性：将 rawValue 转换为 MessageRole
     var role: MessageRole {
         get { MessageRole(rawValue: roleRawValue) ?? .user }
         set { roleRawValue = newValue.rawValue }
+    }
+
+    /// 获取来源列表
+    var sources: [MessageSource] {
+        guard let data = sourcesData else { return [] }
+        return (try? JSONDecoder().decode([MessageSource].self, from: data)) ?? []
+    }
+
+    /// 设置来源列表
+    func setSources(_ sources: [MessageSource]) {
+        sourcesData = try? JSONEncoder().encode(sources)
     }
 }

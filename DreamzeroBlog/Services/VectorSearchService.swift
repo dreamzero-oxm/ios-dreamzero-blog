@@ -34,7 +34,7 @@ final class VectorSearchService: VectorSearchServiceType {
 
         // 按相似度降序排序并取前 K 个
         results.sort { $0.similarity > $1.similarity }
-        let topResults = Array(results.prefix(topK))
+        let topResults = Array(results.prefix(topK).filter { $0.similarity > 0 } )
 
         // 转换为搜索结果
         return topResults.map { result in

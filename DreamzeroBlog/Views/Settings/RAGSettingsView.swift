@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct RAGSettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var viewModel: RAGSettingsViewModel
     @FocusState private var focusedField: Field?
     @State private var showBaiduAuth = false
@@ -98,12 +99,16 @@ struct RAGSettingsView: View {
                         viewModel.saveSettings()
                     }
 
-                TextField("分块分隔符", text: $viewModel.chunkDelimiter)
-                    .focused($focusedField, equals: .delimiter)
-                    .autocorrectionDisabled()
-                    .onChange(of: viewModel.chunkDelimiter) { _, _ in
-                        viewModel.saveSettings()
-                    }
+                HStack {
+                    Text("分块分隔符")
+                    TextField("如：\\n、。、# 等", text: $viewModel.chunkDelimiter)
+                        .focused($focusedField, equals: .delimiter)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onChange(of: viewModel.chunkDelimiter) { _, _ in
+                            viewModel.saveSettings()
+                        }
+                }
             } header: {
                 Text("搜索配置")
             } footer: {
@@ -147,6 +152,13 @@ struct RAGSettingsView: View {
         }
         .navigationTitle("RAG 设置")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("关闭") {
+                    dismiss()
+                }
+            }
+        }
     }
 
     // MARK: - Computed Properties

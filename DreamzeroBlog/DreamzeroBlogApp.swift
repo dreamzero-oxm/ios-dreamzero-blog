@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import Factory
 
 @main
 struct DreamzeroBlogApp: App {
@@ -27,10 +28,32 @@ struct DreamzeroBlogApp: App {
         }
     }()
 
+    init() {
+        // 注册共享的 ModelContainer 到 Factory 容器
+        Container.shared.registerSharedModelContainer(sharedModelContainer)
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    await syncDefaultKnowledgeIfNeeded()
+                }
         }
         .modelContainer(sharedModelContainer)
+    }
+
+    @MainActor
+    private func syncDefaultKnowledgeIfNeeded() async {
+        let service: DefaultKnowledgeServiceType = Container.shared.defaultKnowledgeService()
+
+        // 每次启动都检查同步
+        guard service.needsSync else { return }
+
+        do {
+            try await service.syncDefaultKnowledge()
+        } catch {
+            LogTool.shared.error("默认知识同步失败: \(error)")
+        }
     }
 }

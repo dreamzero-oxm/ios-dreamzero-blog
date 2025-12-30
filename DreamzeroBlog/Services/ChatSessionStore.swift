@@ -71,6 +71,7 @@ final class ChatSessionStore: ChatSessionStoreType {
                     isStreaming: msg.isStreaming
                 )
                 msgModel.session = existing
+                msgModel.setSources(msg.sources)
                 return msgModel
             }
         } else {

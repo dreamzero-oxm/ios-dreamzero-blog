@@ -84,7 +84,7 @@ struct ChunkBrowserView: View {
                     Section {
                         ContentUnavailableView(
                             "暂无分块",
-                            systemImage: "doc.split"
+                            systemImage: "rectangle.split.2x1.slash.fill"
                         )
                     }
                 }
