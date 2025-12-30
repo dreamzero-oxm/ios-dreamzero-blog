@@ -8,17 +8,14 @@
 import SwiftUI
 
 struct LoginView: View {
-    @State private var username = ""
-    @State private var password = ""
-    @State private var isLoading = false
-    @State private var showPassword = false
-    @State private var showRegisterSheet = false
+    @State private var viewModel = LoginViewModel()
     @FocusState private var focusedField: Field?
-    
+    @State private var showRegisterSheet = false
+
     enum Field {
-        case username, password
+        case account, password
     }
-    
+
     var body: some View {
         ZStack {
             // 渐变背景
@@ -28,7 +25,7 @@ struct LoginView: View {
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
-            
+
             VStack(spacing: 30) {
                 // App Logo 区域
                 VStack(spacing: 16) {
@@ -36,66 +33,66 @@ struct LoginView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.white)
                         .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
-                    
+
                     Text("Dreamzero Blog")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
-                    
+
                     Text("欢迎回来")
                         .font(.subheadline)
                         .foregroundColor(.white.opacity(0.9))
                 }
                 .padding(.top, 50)
-                
+
                 // 登录表单卡片
                 VStack(spacing: 20) {
-                    // 用户名输入框
+                    // 账号输入框
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("用户名")
+                        Text("账号")
                             .font(.subheadline)
                             .foregroundColor(.gray)
-                        
+
                         HStack {
                             Image(systemName: "person.fill")
                                 .foregroundColor(.gray)
-                            
-                            TextField("请输入用户名", text: $username)
+
+                            TextField("请输入用户名/邮箱/手机号", text: $viewModel.account)
                                 .textContentType(.username)
                                 .autocapitalization(.none)
                                 .disableAutocorrection(true)
-                                .focused($focusedField, equals: .username)
+                                .focused($focusedField, equals: .account)
                                 .submitLabel(.next)
                         }
                         .padding()
                         .background(Color(.systemGray6))
                         .cornerRadius(12)
                     }
-                    
+
                     // 密码输入框
                     VStack(alignment: .leading, spacing: 8) {
                         Text("密码")
                             .font(.subheadline)
                             .foregroundColor(.gray)
-                        
+
                         HStack {
                             Image(systemName: "lock.fill")
                                 .foregroundColor(.gray)
-                            
-                            if showPassword {
-                                TextField("请输入密码", text: $password)
+
+                            if viewModel.showPassword {
+                                TextField("请输入密码", text: $viewModel.password)
                                     .textContentType(.password)
                                     .focused($focusedField, equals: .password)
                                     .submitLabel(.done)
                             } else {
-                                SecureField("请输入密码", text: $password)
+                                SecureField("请输入密码", text: $viewModel.password)
                                     .textContentType(.password)
                                     .focused($focusedField, equals: .password)
                                     .submitLabel(.done)
                             }
-                            
-                            Button(action: { showPassword.toggle() }) {
-                                Image(systemName: showPassword ? "eye.slash.fill" : "eye.fill")
+
+                            Button(action: { viewModel.showPassword.toggle() }) {
+                                Image(systemName: viewModel.showPassword ? "eye.slash.fill" : "eye.fill")
                                     .foregroundColor(.gray)
                             }
                         }
@@ -103,11 +100,15 @@ struct LoginView: View {
                         .background(Color(.systemGray6))
                         .cornerRadius(12)
                     }
-                    
+
                     // 登录按钮
-                    Button(action: login) {
+                    Button(action: {
+                        Task {
+                            await viewModel.login()
+                        }
+                    }) {
                         HStack {
-                            if isLoading {
+                            if viewModel.isLoading {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             }
@@ -116,22 +117,22 @@ struct LoginView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(username.isEmpty || password.isEmpty ? Color.gray : Color.blue)
+                        .background(viewModel.isValid ? Color.blue : Color.gray)
                         .foregroundColor(.white)
                         .cornerRadius(12)
-                        .scaleEffect(isLoading ? 0.95 : 1.0)
+                        .scaleEffect(viewModel.isLoading ? 0.95 : 1.0)
                     }
-                    .disabled(username.isEmpty || password.isEmpty || isLoading)
-                    .animation(.easeInOut(duration: 0.2), value: isLoading)
+                    .disabled(!viewModel.isValid || viewModel.isLoading)
+                    .animation(.easeInOut(duration: 0.2), value: viewModel.isLoading)
                 }
                 .padding(25)
                 .background(Color(.systemBackground))
                 .cornerRadius(20)
                 .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
                 .padding(.horizontal, 20)
-                
+
                 Spacer()
-                
+
                 // 底部链接
                 HStack(spacing: 20) {
                     Button("忘记密码？") {
@@ -139,10 +140,10 @@ struct LoginView: View {
                     }
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.8))
-                    
+
                     Text("·")
                         .foregroundColor(.white.opacity(0.6))
-                    
+
                     Button("注册新账号") {
                         showRegisterSheet = true
                     }
@@ -154,10 +155,12 @@ struct LoginView: View {
         }
         .onSubmit {
             switch focusedField {
-            case .username:
+            case .account:
                 focusedField = .password
             case .password:
-                login()
+                Task {
+                    await viewModel.login()
+                }
             case .none:
                 break
             }
@@ -165,22 +168,13 @@ struct LoginView: View {
         .onTapGesture {
             focusedField = nil
         }
+        .alert("登录失败", isPresented: $viewModel.showError) {
+            Button("确定") {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
         .sheet(isPresented: $showRegisterSheet) {
             RegisterView()
-        }
-    }
-    
-    private func login() {
-        guard !username.isEmpty, !password.isEmpty else { return }
-        
-        isLoading = true
-        focusedField = nil
-        
-        // 模拟登录请求
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            isLoading = false
-            // 这里调用你的登录API
-            print("登录用户名: \\(username), 密码: \\(password)")
         }
     }
 }

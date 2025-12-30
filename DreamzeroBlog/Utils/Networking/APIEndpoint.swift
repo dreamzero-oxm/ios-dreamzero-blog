@@ -68,6 +68,7 @@ struct APIRequestConvertible: URLRequestConvertible {
         // - CustomParameterEncoder → 业务自己写的特殊编码
         if let parameters = endpoint.parameters {
             request = try endpoint.encoder.encode(parameters, into: request)
+            LogTool.shared.debug("request result: \(String(data: request.httpBody ?? Data(), encoding: .utf8) ?? "nil")")
         }
         
         return request
