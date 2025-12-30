@@ -16,6 +16,7 @@ final class KBDocumentModel {
     var content: String
     var sourceTypeRawValue: String
     var sourcePath: String?
+    var isDefault: Bool  // 标识是否为默认知识（文章/图片同步）
     var createdAt: Date
     var updatedAt: Date
     @Relationship(deleteRule: .cascade, inverse: \KBChunkModel.document) var chunks: [KBChunkModel]
@@ -26,6 +27,7 @@ final class KBDocumentModel {
         content: String,
         sourceType: SourceType = .manual,
         sourcePath: String? = nil,
+        isDefault: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -34,6 +36,7 @@ final class KBDocumentModel {
         self.content = content
         self.sourceTypeRawValue = sourceType.rawValue
         self.sourcePath = sourcePath
+        self.isDefault = isDefault
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.chunks = []

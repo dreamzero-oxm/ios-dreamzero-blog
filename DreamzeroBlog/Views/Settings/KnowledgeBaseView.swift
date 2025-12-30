@@ -101,7 +101,10 @@ struct KnowledgeBaseView: View {
             List {
                 ForEach(viewModel.documents) { document in
                     Button {
-                        editingDocument = document
+                        // 默认知识不可编辑
+                        if !document.isDefault {
+                            editingDocument = document
+                        }
                     } label: {
                         DocumentRowView(document: document)
                     }
@@ -132,7 +135,11 @@ struct KnowledgeBaseView: View {
         guard let viewModel = viewModel else { return }
         Task {
             for index in offsets {
-                await viewModel.deleteDocument(viewModel.documents[index])
+                let document = viewModel.documents[index]
+                // 默认知识不可删除
+                if !document.isDefault {
+                    await viewModel.deleteDocument(document)
+                }
             }
         }
     }
@@ -152,9 +159,22 @@ struct DocumentRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(document.title)
-                .font(.headline)
-                .lineLimit(1)
+            HStack(spacing: 6) {
+                Text(document.title)
+                    .font(.headline)
+                    .lineLimit(1)
+
+                // 默认知识标识
+                if document.isDefault {
+                    Text("默认")
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.2))
+                        .foregroundColor(.blue)
+                        .cornerRadius(4)
+                }
+            }
 
             HStack {
                 Label("\(document.chunks.count) 个分块", systemImage: "doc.on.doc")

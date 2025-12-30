@@ -14,6 +14,7 @@ struct KBDocument: Identifiable, Sendable {
     var content: String
     var sourceType: SourceType
     var sourcePath: String?
+    var isDefault: Bool  // 标识是否为默认知识（文章/图片同步）
     let createdAt: Date
     var updatedAt: Date
     var chunks: [KBChunk]
@@ -24,6 +25,7 @@ struct KBDocument: Identifiable, Sendable {
         content: String,
         sourceType: SourceType = .manual,
         sourcePath: String? = nil,
+        isDefault: Bool = false,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         chunks: [KBChunk] = []
@@ -33,6 +35,7 @@ struct KBDocument: Identifiable, Sendable {
         self.content = content
         self.sourceType = sourceType
         self.sourcePath = sourcePath
+        self.isDefault = isDefault
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.chunks = chunks
