@@ -695,42 +695,50 @@ func copyToClipboard(_ text: String) {
 struct MessageSourcesView: View {
     let sources: [MessageSource]
 
-    @State private var isExpanded: Bool = false
+    @State private var showAll: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 折叠/展开按钮
-            Button(action: { isExpanded.toggle() }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "info.circle.fill")
-                        .font(.caption2)
-                        .foregroundColor(.blue)
+            // 来源列表标题/折叠按钮（仅超过3条时显示）
+            if sources.count > 3 {
+                Button(action: { showAll.toggle() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
 
-                    Text(sourceSummary)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        Text(sourceSummary)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
 
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .buttonStyle(.plain)
-
-            // 展开的列表
-            if isExpanded {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(sources) { source in
-                        SourceRow(source: source)
+                        Image(systemName: showAll ? "chevron.up" : "chevron.down")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
                     }
                 }
-                .padding(.leading, 4)
+                .buttonStyle(.plain)
             }
+
+            // 来源列表（默认显示前三条，点击后显示全部）
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(displayedSources) { source in
+                    SourceRow(source: source)
+                }
+            }
+            .padding(.leading, 4)
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
         .background(Color(.systemGray6).opacity(0.5))
         .cornerRadius(8)
+    }
+
+    /// 计算要显示的来源列表
+    private var displayedSources: [MessageSource] {
+        if sources.count <= 3 || showAll {
+            return sources
+        }
+        return Array(sources.prefix(3))
     }
 
     private var sourceSummary: String {
