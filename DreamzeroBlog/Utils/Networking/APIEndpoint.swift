@@ -30,11 +30,11 @@ public protocol APIEndpoint: Sendable {
 public extension APIEndpoint {
     var parameters: Encodable? { nil }   // 默认不带参数
     var headers: HTTPHeaders?   { nil }   // 默认不加头
-    var requiresAuth: Bool      { true }  // 默认“需要登录”
+    var requiresAuth: Bool      { true }  // 默认"需要登录"
     var timeout: TimeInterval?  { nil }   // 默认不单独设超时
 }
 
-// MARK: - 3. 把“接口蓝图”变成“真正的网络请求”
+// MARK: - 3. 把"接口蓝图"变成"真正的网络请求"
 // Alamofire 的 URLRequestConvertible 协议要求实现 asURLRequest()，
 // 这里做统一装配：拼 URL、装头、装参数、设超时……
 struct APIRequestConvertible: URLRequestConvertible {
@@ -53,7 +53,31 @@ struct APIRequestConvertible: URLRequestConvertible {
         if let timeout = endpoint.timeout {
             request.timeoutInterval = timeout
         }
-        
+
+        // 3-3.5 传递 requiresAuth 元数据给 AuthInterceptor
+        // 使用 URL 查询参数传递元数据（不会实际发送到服务器）
+        if var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            var queryItems = urlComponents.queryItems ?? []
+            queryItems.append(URLQueryItem(name: "_requiresAuth", value: endpoint.requiresAuth ? "true" : "false"))
+            LogTool.shared.debug("Endpoint \(endpoint.path) requiresAuth=\(endpoint.requiresAuth)")
+            urlComponents.queryItems = queryItems
+            if let metadataURL = urlComponents.url {
+                request.url = metadataURL
+            }
+        }
+
+        // 如果 endpoint 有自定义 Authorization 头，标记此信息
+        if let headers = endpoint.headers, headers["Authorization"] != nil {
+            if var urlComponents = URLComponents(url: request.url!, resolvingAgainstBaseURL: false) {
+                var queryItems = urlComponents.queryItems ?? []
+                queryItems.append(URLQueryItem(name: "_hasCustomAuth", value: "true"))
+                urlComponents.queryItems = queryItems
+                if let metadataURL = urlComponents.url {
+                    request.url = metadataURL
+                }
+            }
+        }
+
         // 3-4 追加额外头（业务层可能给 X-Client-Version 等）
         if let headers = endpoint.headers {
             for header in headers {
@@ -68,7 +92,6 @@ struct APIRequestConvertible: URLRequestConvertible {
         // - CustomParameterEncoder → 业务自己写的特殊编码
         if let parameters = endpoint.parameters {
             request = try endpoint.encoder.encode(parameters, into: request)
-            LogTool.shared.debug("request result: \(String(data: request.httpBody ?? Data(), encoding: .utf8) ?? "nil")")
         }
         
         return request

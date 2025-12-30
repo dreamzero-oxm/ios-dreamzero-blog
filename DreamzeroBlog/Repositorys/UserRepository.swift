@@ -58,7 +58,13 @@ protocol UserRepositoryType {
 /// Implements both UserRepositoryType and TokenRefresher protocol
 final class UserRepository: UserRepositoryType, TokenRefresher {
     private let client: APIClient
-
+    
+    private var tokenStore: TokenStore? {
+        let config = KeychainConfiguration(service: "com.dreamzero.blog")
+        let secureStore = KeychainAccessStore(config: config)
+        return TokenStore(store: secureStore)
+    }
+    
     init(client: APIClient) {
         self.client = client
     }
@@ -108,13 +114,15 @@ final class UserRepository: UserRepositoryType, TokenRefresher {
         guard let data = response.data else {
             throw APIError.invalidResponse
         }
-
-        return AuthTokens(
+        
+        let result = AuthTokens(
             accessToken: data.accessToken,
             refreshToken: oldRefreshToken,
             tokenType: "Bearer",
             expiresAt: nil
         )
+
+        return result
     }
 
     // MARK: - Profile

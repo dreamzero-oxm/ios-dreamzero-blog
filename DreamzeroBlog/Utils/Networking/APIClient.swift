@@ -56,6 +56,7 @@ public final class APIClient {
                     case .failure(let error):
                         if let code = resp.response?.statusCode {
                             if code == 401 {
+                                
                                 continuation.resume(throwing: APIError.unauthorized)
                                 return
                             }
