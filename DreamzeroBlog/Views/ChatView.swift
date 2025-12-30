@@ -509,6 +509,12 @@ struct MessageBubble: View, Equatable {
             roleLabelView
             messageContentView
             streamingIndicator
+
+            // 添加来源列表（仅助手消息）
+            if message.role == .assistant && !message.sources.isEmpty {
+                MessageSourcesView(sources: message.sources)
+            }
+
             copyButton
         }
         .frame(maxWidth: 300, alignment: message.role == .user ? .trailing : .leading)
@@ -682,6 +688,119 @@ func copyToClipboard(_ text: String) {
     #elseif os(iOS)
         UIPasteboard.general.string = text
     #endif
+}
+
+// MARK: - 消息来源列表
+
+struct MessageSourcesView: View {
+    let sources: [MessageSource]
+
+    @State private var isExpanded: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // 折叠/展开按钮
+            Button(action: { isExpanded.toggle() }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "info.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+
+                    Text(sourceSummary)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            // 展开的列表
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(sources) { source in
+                        SourceRow(source: source)
+                    }
+                }
+                .padding(.leading, 4)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color(.systemGray6).opacity(0.5))
+        .cornerRadius(8)
+    }
+
+    private var sourceSummary: String {
+        let webCount = sources.filter { $0.type == .webSearch }.count
+        let kbCount = sources.filter { $0.type == .knowledgeBase }.count
+
+        if webCount > 0 && kbCount > 0 {
+            return "引用 \(webCount) 个网络来源 · \(kbCount) 个知识库文件"
+        } else if webCount > 0 {
+            return "引用 \(webCount) 个网络来源"
+        } else if kbCount > 0 {
+            return "引用 \(kbCount) 个知识库文件"
+        }
+        return "来源引用"
+    }
+}
+
+struct SourceRow: View {
+    let source: MessageSource
+
+    var body: some View {
+        Group {
+            if source.type == .webSearch, let url = source.url {
+                // 联网搜索结果 - 可点击
+                if let validUrl = URL(string: url) {
+                    Link(destination: validUrl) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "safari")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+                            Text(source.title)
+                                .font(.caption)
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                    }
+                } else {
+                    // URL 无效时的降级显示
+                    HStack(spacing: 4) {
+                        Image(systemName: "safari")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                        Text(source.title)
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                }
+            } else {
+                // 知识库文件 - 仅展示
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.text")
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                    Text(source.title)
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                    if let similarity = source.similarity {
+                        Text(String(format: "%.1f%%", similarity * 100))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+            }
+        }
+    }
 }
 
 // MARK: - 预览

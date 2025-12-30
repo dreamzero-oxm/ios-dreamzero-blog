@@ -34,6 +34,10 @@ final class ChatViewModel {
     // 存储当前流式传输的 Task，用于取消
     private var streamingTask: Task<Void, Never>?
 
+    // 临时存储当前消息的来源（知识库和联网搜索）
+    private var currentKnowledgeSources: [MessageSource] = []
+    private var currentWebSources: [MessageSource] = []
+
     // 配置
     private let model: String = "glm-4.7"
     private let temperature: Double? = 0.7
@@ -224,6 +228,10 @@ final class ChatViewModel {
 
     /// 使用 RAG 增强查询
     private func enhanceQueryWithRAG(_ query: String) async -> String {
+        // 清空临时存储
+        currentKnowledgeSources = []
+        currentWebSources = []
+
         // 检查 RAG 是否启用
         LogTool.shared.debug("RAG isEnabled: \(ragConfig.isEnabled)")
         guard ragConfig.isEnabled else { return query }
@@ -256,6 +264,15 @@ final class ChatViewModel {
                     let documents = try await store.fetchAllDocuments()
                     let documentMap = Dictionary(uniqueKeysWithValues: documents.map { ($0.id, $0.title) })
 
+                    // 保存到临时变量
+                    currentKnowledgeSources = results.map { result in
+                        MessageSource(
+                            type: .knowledgeBase,
+                            title: documentMap[result.chunk.documentId] ?? "未知文档",
+                            similarity: result.similarity
+                        )
+                    }
+
                     // 构建上下文
                     context = results.map { result in
                         let title = documentMap[result.chunk.documentId] ?? "未知文档"
@@ -276,6 +293,15 @@ final class ChatViewModel {
             do {
                 let webResults = try await webService.search(query: query)
                 if !webResults.isEmpty {
+                    // 保存到临时变量
+                    currentWebSources = webResults.map { result in
+                        MessageSource(
+                            type: .webSearch,
+                            title: result.title,
+                            url: result.url
+                        )
+                    }
+
                     webContext = webResults.map { result in
                         "[\(result.title)](\(result.url))\n\(result.content)"
                     }.joined(separator: "\n\n")
@@ -320,6 +346,12 @@ final class ChatViewModel {
         do {
             // RAG 增强查询
             let enhancedContent = await enhanceQueryWithRAG(userMessage.content)
+
+            // 更新助手消息的 sources
+            if let index = messages.indices.last, messages[index].role == .assistant {
+                messages[index].sources = currentKnowledgeSources + currentWebSources
+                currentSession.messages[index].sources = currentKnowledgeSources + currentWebSources
+            }
 
             // 发送最后5条消息（包含当前用户问题），保持对话上下文
             let recentMessages = Array(messages.suffix(5).dropLast())

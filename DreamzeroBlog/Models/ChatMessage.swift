@@ -14,6 +14,36 @@ public enum MessageRole: String, Sendable {
     case assistant
 }
 
+/// 消息引用的来源
+public struct MessageSource: Identifiable, Sendable, Equatable, Codable {
+    public let id: String
+    public let type: SourceType
+    public let title: String
+    public let url: String?  // 用于联网搜索
+    public let similarity: Double?  // 用于知识库（相似度）
+
+    public enum SourceType: String, Sendable, Codable {
+        case knowledgeBase  // 知识库
+        case webSearch      // 联网搜索
+    }
+
+    public init(id: String = UUID().uuidString, type: SourceType, title: String, url: String? = nil, similarity: Double? = nil) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.url = url
+        self.similarity = similarity
+    }
+
+    public static func == (lhs: MessageSource, rhs: MessageSource) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.type == rhs.type &&
+        lhs.title == rhs.title &&
+        lhs.url == rhs.url &&
+        lhs.similarity == rhs.similarity
+    }
+}
+
 /// 聊天消息领域模型
 public struct ChatMessage: Identifiable, Sendable, Equatable {
     public let id: String
@@ -21,26 +51,30 @@ public struct ChatMessage: Identifiable, Sendable, Equatable {
     public var content: String
     public let timestamp: Date
     public var isStreaming: Bool  // 是否正在流式生成中
+    public var sources: [MessageSource]  // 消息引用的来源列表
 
     public init(
         id: String = UUID().uuidString,
         role: MessageRole,
         content: String,
         timestamp: Date = Date(),
-        isStreaming: Bool = false
+        isStreaming: Bool = false,
+        sources: [MessageSource] = []
     ) {
         self.id = id
         self.role = role
         self.content = content
         self.timestamp = timestamp
         self.isStreaming = isStreaming
+        self.sources = sources
     }
 
     public static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
         lhs.id == rhs.id &&
         lhs.role == rhs.role &&
         lhs.content == rhs.content &&
-        lhs.isStreaming == rhs.isStreaming
+        lhs.isStreaming == rhs.isStreaming &&
+        lhs.sources == rhs.sources
     }
 
     /// 从DTO创建用户消息
@@ -50,6 +84,7 @@ public struct ChatMessage: Identifiable, Sendable, Equatable {
         self.content = dto.content
         self.timestamp = Date()
         self.isStreaming = false
+        self.sources = []
     }
 }
 
@@ -108,7 +143,8 @@ extension ChatMessageModel {
             role: role,
             content: content,
             timestamp: timestamp,
-            isStreaming: isStreaming
+            isStreaming: isStreaming,
+            sources: sources
         )
     }
 }
@@ -138,6 +174,7 @@ extension ChatMessage {
             isStreaming: isStreaming
         )
         msgModel.session = session
+        msgModel.setSources(sources)
         return msgModel
     }
 }
