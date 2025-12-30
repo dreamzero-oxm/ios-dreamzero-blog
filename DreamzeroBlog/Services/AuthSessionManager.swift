@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import Factory
 
 /// Authentication session manager
 /// Manages user authentication state and coordinates between auth components
@@ -30,27 +31,18 @@ final class AuthSessionManager {
         tokenStore: TokenStore? = nil,
         userRepository: UserRepositoryType? = nil
     ) {
-        // Use provided dependencies or create defaults
+        // Use provided dependencies or get from container
         if let tokenStore = tokenStore {
             self.tokenStore = tokenStore
         } else {
-            let config = KeychainConfiguration(service: "com.dreamzero.blog")
-            let secureStore = KeychainAccessStore(config: config)
-            self.tokenStore = TokenStore(store: secureStore)
+            self.tokenStore = Container.shared.tokenStore()
         }
 
         if let userRepository = userRepository {
             self.userRepository = userRepository
         } else {
-            // Create a temp client without auth for the repository
-            let tempClient = APIClient(
-                baseURL: URL(string: "https://www.dreamzero.cn")!,
-                timeout: 30,
-                additionalHeaders: nil,
-                eventMonitors: [],
-                interceptors: []
-            )
-            self.userRepository = UserRepository(client: tempClient)
+            // Use injected apiClient which has AuthInterceptor
+            self.userRepository = Container.shared.userRepository()
         }
     }
 

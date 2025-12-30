@@ -7,6 +7,7 @@
 
 import SwiftUI
 import PhotosUI
+import Factory
 
 /// User profile view model - handles profile operations
 @Observable
@@ -50,15 +51,8 @@ final class UserProfileViewModel {
         if let userRepository = userRepository {
             self.userRepository = userRepository
         } else {
-            // Create a temp client without auth for operations
-            let tempClient = APIClient(
-                baseURL: URL(string: "https://www.dreamzero.cn")!,
-                timeout: 30,
-                additionalHeaders: nil,
-                eventMonitors: [],
-                interceptors: []
-            )
-            self.userRepository = UserRepository(client: tempClient)
+            // Use injected apiClient which has AuthInterceptor
+            self.userRepository = Container.shared.userRepository()
         }
     }
 

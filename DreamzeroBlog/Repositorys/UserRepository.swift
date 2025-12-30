@@ -107,7 +107,7 @@ final class UserRepository: UserRepositoryType, TokenRefresher {
             as: SingleResponse<RefreshTokenResponseData>.self
         )
 
-        guard response.code == 200 else {
+        guard response.code == 0 else {
             throw APIError.server(code: response.code, message: response.msg)
         }
 
@@ -134,7 +134,7 @@ final class UserRepository: UserRepositoryType, TokenRefresher {
             as: SingleResponse<UserProfileResponseData>.self
         )
 
-        guard response.code == 200 else {
+        guard response.code == 0 else {
             throw APIError.server(code: response.code, message: response.msg)
         }
 
@@ -170,7 +170,7 @@ final class UserRepository: UserRepositoryType, TokenRefresher {
             as: SingleResponse<UpdateProfileResponseData>.self
         )
 
-        guard response.code == 200 else {
+        guard response.code == 0 else {
             throw APIError.server(code: response.code, message: response.msg)
         }
 
@@ -188,7 +188,7 @@ final class UserRepository: UserRepositoryType, TokenRefresher {
             as: SingleResponse<AvatarUploadResponseData>.self
         )
 
-        guard response.code == 200 else {
+        guard response.code == 0 else {
             throw APIError.server(code: response.code, message: response.msg)
         }
 
