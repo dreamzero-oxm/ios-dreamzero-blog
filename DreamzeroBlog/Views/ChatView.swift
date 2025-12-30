@@ -148,6 +148,9 @@ struct ChatView: View {
                 scrollToBottom(proxy: proxy, animated: false)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .streamContentDidUpdate)) { _ in
+            scrollToBottom(proxy: proxy, animated: false)
+        }
     }
 
     private var messageList: some View {
@@ -532,7 +535,11 @@ struct MessageBubble: View, Equatable {
         Group {
             if message.role == .user {
                 userMessageView
+            } else if message.isStreaming || !message.prefersMarkdown {
+                // 流式输出时：使用纯文本渲染（高性能）
+                plainTextView
             } else {
+                // 流式结束后：使用 Markdown 渲染（完整格式）
                 assistantMessageView
             }
         }
@@ -553,6 +560,21 @@ struct MessageBubble: View, Equatable {
             .padding(12)
             .background(backgroundColor)
             .cornerRadius(16)
+    }
+
+    // 纯文本视图（流式输出时使用，避免 Markdown 重复解析）
+    private var plainTextView: some View {
+        Text(message.content)
+            .font(.body)
+            .foregroundColor(.primary)
+            .padding(12)
+            .background(backgroundColor)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(borderColor, lineWidth: 0.5)
+            )
+            .textSelection(.enabled)
     }
 
     private var assistantMessageView: some View {
@@ -605,7 +627,10 @@ struct MessageBubble: View, Equatable {
     }
 
     static func == (lhs: MessageBubble, rhs: MessageBubble) -> Bool {
-        lhs.message == rhs.message
+        lhs.message.id == rhs.message.id &&
+        lhs.message.isStreaming == rhs.message.isStreaming &&
+        lhs.message.prefersMarkdown == rhs.message.prefersMarkdown &&
+        lhs.message.content.count == rhs.message.content.count
     }
 
     private var roleLabel: String {

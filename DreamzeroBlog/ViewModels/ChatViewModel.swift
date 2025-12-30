@@ -9,6 +9,11 @@ import Foundation
 import Observation
 import Factory
 
+// 通知名称扩展
+extension Notification.Name {
+    static let streamContentDidUpdate = Notification.Name("streamContentDidUpdate")
+}
+
 @MainActor
 @Observable
 final class ChatViewModel {
@@ -26,10 +31,10 @@ final class ChatViewModel {
     var isStreaming: Bool = false  // 是否正在接收流式响应
     var inputText: String = ""     // 用户输入的文本
 
-    // 流式更新节流 - 私有状态，不触发观察
-    private var streamingContent: String = ""
-    private var lastUpdateTime: Date = .distantPast
-    private let updateInterval: TimeInterval = 0.08  // 80ms 更新一次（约12fps）
+    // 流式更新节流 - 使用 @ObservationIgnored 避免触发 UI 更新
+    @ObservationIgnored private var streamingContent: String = ""
+    @ObservationIgnored private var lastUpdateTime: Date = .distantPast
+    private let updateInterval: TimeInterval = 0.1  // 100ms 更新一次（10fps），降低更新频率
 
     // 存储当前流式传输的 Task，用于取消
     private var streamingTask: Task<Void, Never>?
@@ -390,7 +395,9 @@ final class ChatViewModel {
             // 流式传输完成
             if let index = messages.indices.last {
                 messages[index].isStreaming = false
+                messages[index].prefersMarkdown = true  // 启用 Markdown 渲染
                 currentSession.messages[index].isStreaming = false
+                currentSession.messages[index].prefersMarkdown = true
             }
             self.isStreaming = false
             self.state = .loaded
@@ -463,6 +470,9 @@ final class ChatViewModel {
         // 只更新内容，避免触发整个数组变化
         messages[index].content = streamingContent
         currentSession.messages[index].content = streamingContent
+
+        // 发送通知以触发滚动
+        NotificationCenter.default.post(name: .streamContentDidUpdate, object: nil)
     }
 
     // MARK: - 其他操作

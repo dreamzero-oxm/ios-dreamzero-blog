@@ -52,6 +52,7 @@ public struct ChatMessage: Identifiable, Sendable, Equatable {
     public let timestamp: Date
     public var isStreaming: Bool  // 是否正在流式生成中
     public var sources: [MessageSource]  // 消息引用的来源列表
+    public var prefersMarkdown: Bool = false  // 是否偏好 Markdown 渲染（流式结束后设为 true）
 
     public init(
         id: String = UUID().uuidString,
@@ -59,7 +60,8 @@ public struct ChatMessage: Identifiable, Sendable, Equatable {
         content: String,
         timestamp: Date = Date(),
         isStreaming: Bool = false,
-        sources: [MessageSource] = []
+        sources: [MessageSource] = [],
+        prefersMarkdown: Bool = false
     ) {
         self.id = id
         self.role = role
@@ -67,14 +69,15 @@ public struct ChatMessage: Identifiable, Sendable, Equatable {
         self.timestamp = timestamp
         self.isStreaming = isStreaming
         self.sources = sources
+        self.prefersMarkdown = prefersMarkdown
     }
 
     public static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
         lhs.id == rhs.id &&
         lhs.role == rhs.role &&
-        lhs.content == rhs.content &&
         lhs.isStreaming == rhs.isStreaming &&
-        lhs.sources == rhs.sources
+        lhs.prefersMarkdown == rhs.prefersMarkdown &&
+        lhs.sources.count == rhs.sources.count
     }
 
     /// 从DTO创建用户消息
