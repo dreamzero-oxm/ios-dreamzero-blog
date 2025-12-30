@@ -99,12 +99,16 @@ struct RAGSettingsView: View {
                         viewModel.saveSettings()
                     }
 
-                TextField("分块分隔符", text: $viewModel.chunkDelimiter)
-                    .focused($focusedField, equals: .delimiter)
-                    .autocorrectionDisabled()
-                    .onChange(of: viewModel.chunkDelimiter) { _, _ in
-                        viewModel.saveSettings()
-                    }
+                HStack {
+                    Text("分块分隔符")
+                    TextField("如：\\n、。、# 等", text: $viewModel.chunkDelimiter)
+                        .focused($focusedField, equals: .delimiter)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onChange(of: viewModel.chunkDelimiter) { _, _ in
+                            viewModel.saveSettings()
+                        }
+                }
             } header: {
                 Text("搜索配置")
             } footer: {
