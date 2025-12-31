@@ -39,6 +39,7 @@ final class ChatMessageModel {
     var content: String
     var timestamp: Date
     var isStreaming: Bool
+    var prefersMarkdown: Bool = false
     var session: ChatSessionModel?
 
     // 存储 MessageSource 数组的 JSON 数据
@@ -49,13 +50,15 @@ final class ChatMessageModel {
         role: MessageRole,
         content: String,
         timestamp: Date = Date(),
-        isStreaming: Bool = false
+        isStreaming: Bool = false,
+        prefersMarkdown: Bool = false
     ) {
         self.id = id
         self.roleRawValue = role.rawValue
         self.content = content
         self.timestamp = timestamp
         self.isStreaming = isStreaming
+        self.prefersMarkdown = prefersMarkdown
         self.sourcesData = nil
     }
 

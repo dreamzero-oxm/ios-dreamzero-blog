@@ -147,7 +147,8 @@ extension ChatMessageModel {
             content: content,
             timestamp: timestamp,
             isStreaming: isStreaming,
-            sources: sources
+            sources: sources,
+            prefersMarkdown: prefersMarkdown
         )
     }
 }
@@ -174,7 +175,8 @@ extension ChatMessage {
             role: role,
             content: content,
             timestamp: timestamp,
-            isStreaming: isStreaming
+            isStreaming: isStreaming,
+            prefersMarkdown: prefersMarkdown
         )
         msgModel.session = session
         msgModel.setSources(sources)

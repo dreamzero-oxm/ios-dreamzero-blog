@@ -119,6 +119,13 @@ final class ChatViewModel {
             return lhs.id < rhs.id
         }
 
+        // 历史会话中的消息应启用 Markdown 渲染（非流式状态的助手指消息）
+        for index in messages.indices {
+            if messages[index].role == .assistant && !messages[index].isStreaming {
+                messages[index].prefersMarkdown = true
+            }
+        }
+
         hasGeneratedTitle = !session.title.isEmpty && session.title != "新对话"
         state = .loaded
     }
